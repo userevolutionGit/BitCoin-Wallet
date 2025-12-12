@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
 import { ShieldCheck, AlertTriangle, Send as SendIcon, CheckCircle2 } from 'lucide-react';
 import { analyzeTransactionRisk } from '../services/geminiService';
+import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from '../types';
 
-const SendForm: React.FC = () => {
+interface SendFormProps {
+  network: Network;
+}
+
+const SendForm: React.FC<SendFormProps> = ({ network }) => {
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [riskReport, setRiskReport] = useState<string | null>(null);
   const [step, setStep] = useState<'input' | 'confirm' | 'success'>('input');
+
+  const currentPlaceholder = network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS;
 
   const handleAnalyze = async () => {
     if (!address) return;
@@ -38,7 +45,7 @@ const SendForm: React.FC = () => {
         </div>
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">Transaction Sent!</h2>
-          <p className="text-slate-400">Your {amount} BTC is on its way to the blockchain.</p>
+          <p className="text-slate-400">Your {amount} {network === 'TESTNET' ? 'tBTC' : 'BTC'} is on its way to the blockchain.</p>
         </div>
         <button 
           onClick={reset}
@@ -53,7 +60,7 @@ const SendForm: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="bg-slate-800/50 border border-slate-700 p-8 rounded-2xl shadow-xl">
-        <h2 className="text-2xl font-bold text-white mb-6">Send Bitcoin</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">Send Bitcoin <span className="text-sm font-normal text-slate-400 ml-2">({network})</span></h2>
         
         {step === 'input' && (
           <div className="space-y-6">
@@ -63,13 +70,13 @@ const SendForm: React.FC = () => {
                 type="text" 
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="bc1q..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                placeholder={currentPlaceholder}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all placeholder:text-slate-600"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-2">Amount (BTC)</label>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Amount ({network === 'TESTNET' ? 'tBTC' : 'BTC'})</label>
               <div className="relative">
                 <input 
                   type="number" 
@@ -78,9 +85,9 @@ const SendForm: React.FC = () => {
                   placeholder="0.00000000"
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 />
-                <span className="absolute right-4 top-3.5 text-slate-500 font-medium">BTC</span>
+                <span className="absolute right-4 top-3.5 text-slate-500 font-medium">{network === 'TESTNET' ? 'tBTC' : 'BTC'}</span>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Available: 1.2450 BTC</p>
+              <p className="text-xs text-slate-500 mt-2">Available: 1.2450 {network === 'TESTNET' ? 'tBTC' : 'BTC'}</p>
             </div>
 
             <button 
@@ -122,15 +129,15 @@ const SendForm: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Amount</span>
-                <span className="text-amber-500 font-bold">{amount} BTC</span>
+                <span className="text-amber-500 font-bold">{amount} {network === 'TESTNET' ? 'tBTC' : 'BTC'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Network Fee</span>
-                <span className="text-slate-200">0.000015 BTC</span>
+                <span className="text-slate-200">0.000015 {network === 'TESTNET' ? 'tBTC' : 'BTC'}</span>
               </div>
               <div className="border-t border-slate-800 pt-3 flex justify-between font-bold">
                 <span className="text-white">Total</span>
-                <span className="text-white">{(Number(amount) + 0.000015).toFixed(6)} BTC</span>
+                <span className="text-white">{(Number(amount) + 0.000015).toFixed(6)} {network === 'TESTNET' ? 'tBTC' : 'BTC'}</span>
               </div>
             </div>
 

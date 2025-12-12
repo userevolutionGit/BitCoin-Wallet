@@ -1,39 +1,40 @@
-import React, { useState } from 'react';
-import { LayoutDashboard, Send, Download, Bot, LogOut, Bitcoin, Menu, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, Send, Download, Bot, LogOut, Bitcoin, Menu, X, Terminal, CheckCircle2 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import SendForm from './components/SendForm';
 import GeminiAdvisor from './components/GeminiAdvisor';
-import { AppView, WalletState, TransactionType, TransactionStatus } from './types';
+import Console from './components/Console';
+import { AppView, WalletState, TransactionType, TransactionStatus, TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from './types';
 
 const INITIAL_WALLET_STATE: WalletState = {
-  btcBalance: 1.24503211,
-  fiatBalance: 78540.23,
+  btcBalance: 0.05234891,
+  fiatBalance: 0, // Calculated dynamically
   transactions: [
     {
       id: 'tx1',
       type: TransactionType.RECEIVE,
-      amount: 0.15,
-      fiatValue: 9450,
-      date: '2 hours ago',
-      address: 'bc1q...x9p2',
+      amount: 0.00125000,
+      fiatValue: 82.50,
+      date: 'Dec 10, 2025',
+      address: TESTNET_ADDRESS,
       status: TransactionStatus.COMPLETED
     },
     {
       id: 'tx2',
       type: TransactionType.SEND,
-      amount: 0.02,
-      fiatValue: 1260,
-      date: 'Yesterday',
-      address: '3J98...kL2m',
+      amount: 0.00050000,
+      fiatValue: 33.00,
+      date: 'Dec 8, 2025',
+      address: TESTNET_ADDRESS,
       status: TransactionStatus.COMPLETED
     },
     {
       id: 'tx3',
       type: TransactionType.RECEIVE,
-      amount: 0.5,
-      fiatValue: 31500,
-      date: '3 days ago',
-      address: 'bc1q...m4k9',
+      amount: 0.05000000,
+      fiatValue: 3300.00,
+      date: 'Dec 5, 2025',
+      address: TESTNET_ADDRESS,
       status: TransactionStatus.COMPLETED
     }
   ]
@@ -43,6 +44,42 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [walletState] = useState<WalletState>(INITIAL_WALLET_STATE);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [network, setNetwork] = useState<Network>('TESTNET');
+  const [btcPrice, setBtcPrice] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchPrice = async () => {
+      try {
+        const response = await fetch('https://api.coindesk.com/v1/bpi/currentprice.json');
+        const data = await response.json();
+        if (data?.bpi?.USD?.rate_float) {
+          setBtcPrice(data.bpi.USD.rate_float);
+        }
+      } catch (error) {
+        console.error('Failed to fetch Bitcoin price:', error);
+      }
+    };
+
+    fetchPrice();
+    const interval = setInterval(fetchPrice, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentAddress = network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS;
+
+  // Calculate dynamic fiat balance based on current BTC price
+  const displayedWalletState = {
+    ...walletState,
+    fiatBalance: walletState.btcBalance * btcPrice
+  };
+
+  const toggleNetwork = () => {
+    setNetwork(prev => prev === 'MAINNET' ? 'TESTNET' : 'MAINNET');
+  };
+
+  const handleNavigate = (view: AppView) => {
+    setCurrentView(view);
+  };
 
   const NavItem = ({ view, icon: Icon, label }: { view: AppView; icon: any; label: string }) => (
     <button
@@ -77,12 +114,15 @@ const App: React.FC = () => {
           <NavItem view={AppView.SEND} icon={Send} label="Send" />
           <NavItem view={AppView.RECEIVE} icon={Download} label="Receive" />
           <NavItem view={AppView.ADVISOR} icon={Bot} label="AI Advisor" />
+          <NavItem view={AppView.CLI} icon={Terminal} label="Bitcoin CLI" />
         </nav>
 
         <div className="p-4 m-4 bg-slate-900 rounded-xl border border-slate-800">
           <p className="text-xs text-slate-500 mb-2">Current BTC Price</p>
-          <p className="text-lg font-bold text-white">$64,520.10</p>
-          <span className="text-xs text-emerald-400 font-medium">+2.4% today</span>
+          <p className="text-lg font-bold text-white">
+            {btcPrice ? `$${btcPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Loading...'}
+          </p>
+          <span className="text-xs text-emerald-400 font-medium">Live from CoinDesk</span>
         </div>
       </aside>
 
@@ -104,6 +144,7 @@ const App: React.FC = () => {
           <NavItem view={AppView.SEND} icon={Send} label="Send" />
           <NavItem view={AppView.RECEIVE} icon={Download} label="Receive" />
           <NavItem view={AppView.ADVISOR} icon={Bot} label="AI Advisor" />
+          <NavItem view={AppView.CLI} icon={Terminal} label="Bitcoin CLI" />
         </nav>
       </div>
 
@@ -118,13 +159,28 @@ const App: React.FC = () => {
           </div>
           <div className="hidden lg:block">
             <h2 className="text-lg font-semibold text-white capitalize">
-              {currentView === AppView.ADVISOR ? 'Zenith AI Advisor' : currentView.toLowerCase()}
+              {currentView === AppView.ADVISOR ? 'Zenith AI Advisor' : 
+               currentView === AppView.CLI ? 'Bitcoin Core Console' : 
+               currentView.toLowerCase()}
             </h2>
           </div>
           <div className="flex items-center space-x-4">
-            <button className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-xs font-medium text-slate-300">Mainnet</span>
+            <button 
+              onClick={toggleNetwork}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all border ${
+                network === 'MAINNET' 
+                  ? 'bg-emerald-950/30 border-emerald-500/50 hover:bg-emerald-900/40' 
+                  : 'bg-amber-950/30 border-amber-500/50 hover:bg-amber-900/40'
+              }`}
+            >
+              <div className={`w-2 h-2 rounded-full animate-pulse ${
+                network === 'MAINNET' ? 'bg-emerald-500' : 'bg-amber-500'
+              }`}></div>
+              <span className={`text-xs font-medium ${
+                network === 'MAINNET' ? 'text-emerald-400' : 'text-amber-400'
+              }`}>
+                {network === 'MAINNET' ? 'Mainnet' : 'Testnet'}
+              </span>
             </button>
             <div className="w-8 h-8 bg-gradient-to-tr from-amber-400 to-orange-600 rounded-full cursor-pointer hover:ring-2 ring-offset-2 ring-offset-slate-900 ring-amber-500 transition-all"></div>
           </div>
@@ -133,27 +189,34 @@ const App: React.FC = () => {
         {/* Scrollable View Area */}
         <div className="flex-1 overflow-y-auto p-4 lg:p-8">
           <div className="max-w-7xl mx-auto h-full">
-            {currentView === AppView.DASHBOARD && <Dashboard walletState={walletState} />}
-            {currentView === AppView.SEND && <SendForm />}
+            {currentView === AppView.DASHBOARD && (
+              <Dashboard 
+                walletState={displayedWalletState} 
+                network={network} 
+                onNavigate={handleNavigate} 
+              />
+            )}
+            {currentView === AppView.SEND && <SendForm network={network} />}
             {currentView === AppView.ADVISOR && <GeminiAdvisor />}
+            {currentView === AppView.CLI && <Console network={network} />}
             {currentView === AppView.RECEIVE && (
               <div className="flex flex-col items-center justify-center h-full space-y-8 animate-fade-in">
                 <div className="text-center">
-                  <h2 className="text-3xl font-bold text-white mb-2">Receive Bitcoin</h2>
+                  <h2 className="text-3xl font-bold text-white mb-2">Receive Bitcoin <span className="text-lg text-slate-500 align-top">({network})</span></h2>
                   <p className="text-slate-400">Scan the QR code or copy the address below</p>
                 </div>
                 
                 <div className="bg-white p-6 rounded-2xl shadow-2xl shadow-white/5">
                   <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh`} 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${currentAddress}`} 
                     alt="Wallet QR Code" 
                     className="w-64 h-64 mix-blend-multiply"
                   />
                 </div>
 
-                <div className="w-full max-w-md bg-slate-800 p-4 rounded-xl flex items-center justify-between border border-slate-700">
+                <div className="w-full max-w-2xl bg-slate-800 p-4 rounded-xl flex items-center justify-between border border-slate-700">
                   <code className="text-amber-500 font-mono text-sm truncate mr-4">
-                    bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh
+                    {currentAddress}
                   </code>
                   <button className="text-slate-400 hover:text-white transition-colors" title="Copy">
                     <Download size={20} className="transform rotate-180" />
