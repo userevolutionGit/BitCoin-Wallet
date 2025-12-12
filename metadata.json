@@ -1,0 +1,5 @@
+{
+  "name": "Zenith Bitcoin Wallet",
+  "description": "A modern, secure Bitcoin wallet dashboard featuring real-time market visualization, transaction management, and an AI-powered crypto advisor using Gemini.",
+  "requestFramePermissions": []
+}
