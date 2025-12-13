@@ -15,6 +15,11 @@ export enum TransactionStatus {
   FAILED = 'FAILED'
 }
 
+export interface TransactionInputOutput {
+  address: string;
+  amount: number;
+}
+
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -23,6 +28,10 @@ export interface Transaction {
   date: string;
   address: string;
   status: TransactionStatus;
+  confirmations?: number;
+  fee?: number;
+  inputs?: TransactionInputOutput[];
+  outputs?: TransactionInputOutput[];
 }
 
 export interface WalletState {

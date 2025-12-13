@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown } from 'lucide-react';
+import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown, Wallet } from 'lucide-react';
 import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from '../types';
 import { executeBitcoinCli } from '../services/bitcoinCli';
 
@@ -379,6 +379,14 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
             placeholder="Enter command..."
             autoFocus
             />
+            <button
+                onClick={() => handleCommand('getwalletinfo')}
+                className="ml-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-500 hover:text-amber-400 text-xs font-mono rounded border border-slate-700 transition-colors flex items-center space-x-1"
+                title="Get Wallet Info"
+            >
+                <Wallet size={14} />
+                <span className="hidden sm:inline">getwalletinfo</span>
+            </button>
         </div>
       </div>
     </div>

@@ -5,6 +5,11 @@ interface WalletContext {
 }
 
 const generateMockTxs = (address: string, network: Network): Transaction[] => {
+  const commonProps = {
+    confirmations: network === 'TESTNET' ? 120 : 6,
+    fee: 0.000015
+  };
+
   if (network === 'TESTNET') {
     return [
       {
@@ -14,7 +19,14 @@ const generateMockTxs = (address: string, network: Network): Transaction[] => {
         fiatValue: 0,
         date: 'Dec 10, 2025',
         address: address,
-        status: TransactionStatus.COMPLETED
+        status: TransactionStatus.COMPLETED,
+        ...commonProps,
+        inputs: [
+            { address: 'tb1q...sender', amount: 0.00126500 }
+        ],
+        outputs: [
+            { address: address, amount: 0.00125000 }
+        ]
       },
       {
         id: 'tx2',
@@ -23,7 +35,15 @@ const generateMockTxs = (address: string, network: Network): Transaction[] => {
         fiatValue: 0,
         date: 'Dec 8, 2025',
         address: address,
-        status: TransactionStatus.COMPLETED
+        status: TransactionStatus.COMPLETED,
+        ...commonProps,
+        inputs: [
+            { address: address, amount: 0.00051500 }
+        ],
+        outputs: [
+            { address: 'tb1q...recipient', amount: 0.00050000 },
+            { address: 'tb1q...change', amount: 0.00000000 } // Change usually goes back to a new change address
+        ]
       },
       {
         id: 'tx3',
@@ -32,7 +52,14 @@ const generateMockTxs = (address: string, network: Network): Transaction[] => {
         fiatValue: 0,
         date: 'Dec 5, 2025',
         address: address,
-        status: TransactionStatus.COMPLETED
+        status: TransactionStatus.COMPLETED,
+        ...commonProps,
+        inputs: [
+            { address: 'tb1q...whale', amount: 0.05001500 }
+        ],
+        outputs: [
+            { address: address, amount: 0.05000000 }
+        ]
       }
     ];
   } else {
@@ -44,7 +71,14 @@ const generateMockTxs = (address: string, network: Network): Transaction[] => {
         fiatValue: 0,
         date: 'Dec 12, 2025',
         address: address,
-        status: TransactionStatus.COMPLETED
+        status: TransactionStatus.COMPLETED,
+        ...commonProps,
+        inputs: [
+            { address: 'bc1q...sender', amount: 0.02501500 }
+        ],
+        outputs: [
+            { address: address, amount: 0.02500000 }
+        ]
       },
       {
         id: 'mx2',
@@ -53,7 +87,15 @@ const generateMockTxs = (address: string, network: Network): Transaction[] => {
         fiatValue: 0,
         date: 'Dec 11, 2025',
         address: address,
-        status: TransactionStatus.PENDING
+        status: TransactionStatus.PENDING,
+        confirmations: 0,
+        fee: 0.000025,
+        inputs: [
+            { address: address, amount: 0.00102500 }
+        ],
+        outputs: [
+            { address: 'bc1q...recipient', amount: 0.00100000 }
+        ]
       }
     ];
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LayoutDashboard, Send, Download, Bot, LogOut, Bitcoin, Menu, X, Terminal, CheckCircle2, KeyRound } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import SendForm from './components/SendForm';
@@ -67,29 +67,31 @@ const App: React.FC = () => {
 
   const currentAddress = addresses[network];
 
-  // Fetch Balance and Transactions from CLI Service when network or address changes
-  useEffect(() => {
-    const syncNode = async () => {
-      setIsSyncing(true);
-      try {
-        const context = { address: currentAddress };
-        
-        // Fetch Balance
-        const balance = await executeBitcoinCli('getbalance', [], network, context);
-        setFetchedBalance(balance);
+  // Define sync logic as a reusable function
+  const refreshWalletData = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const context = { address: currentAddress };
+      
+      // Fetch Balance
+      const balance = await executeBitcoinCli('getbalance', [], network, context);
+      setFetchedBalance(balance);
 
-        // Fetch Transactions
-        const transactions = await executeBitcoinCli('listtransactions', [], network, context);
-        setWalletState(prev => ({ ...prev, transactions }));
-        
-      } catch (e) {
-        console.error("Failed to sync with node:", e);
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-    syncNode();
+      // Fetch Transactions
+      const transactions = await executeBitcoinCli('listtransactions', [], network, context);
+      setWalletState(prev => ({ ...prev, transactions }));
+      
+    } catch (e) {
+      console.error("Failed to sync with node:", e);
+    } finally {
+      setIsSyncing(false);
+    }
   }, [network, currentAddress]);
+
+  // Initial fetch and fetch on dependencies change
+  useEffect(() => {
+    refreshWalletData();
+  }, [refreshWalletData]);
 
   const handleImportWallet = (seed: string) => {
     const newTestnet = simulateAddressFromSeed(seed, 'TESTNET');
@@ -102,6 +104,10 @@ const App: React.FC = () => {
     
     // Reset to dashboard to show new data
     setCurrentView(AppView.DASHBOARD);
+  };
+
+  const handleClearTransactions = () => {
+    setWalletState(prev => ({ ...prev, transactions: [] }));
   };
 
   // Calculate dynamic fiat balance and update transaction values
@@ -260,7 +266,10 @@ const App: React.FC = () => {
               <Dashboard 
                 walletState={displayedWalletState} 
                 network={network} 
-                onNavigate={handleNavigate} 
+                onNavigate={handleNavigate}
+                onClearTransactions={handleClearTransactions}
+                onRefresh={refreshWalletData}
+                isRefreshing={isSyncing}
               />
             )}
             {currentView === AppView.SEND && <SendForm network={network} />}
