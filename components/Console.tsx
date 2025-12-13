@@ -84,7 +84,9 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
     Wallet: [
       { cmd: 'getbalance', args: false },
       { cmd: 'getnewaddress', args: false },
+      { cmd: 'getaddressinfo', args: true, template: `getaddressinfo ${placeholderAddress}` },
       { cmd: 'sendtoaddress', args: true, template: `sendtoaddress ${placeholderAddress} 0.001` },
+      { cmd: 'listreceivedbyaddress', args: true, template: 'listreceivedbyaddress 0 true' },
       { cmd: 'listunspent', args: false },
       { cmd: 'getwalletinfo', args: false },
       { cmd: 'dumpwallet', args: true, template: 'dumpwallet wallet.dat' },

@@ -37,11 +37,16 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddr
     setExpandedTxId(expandedTxId === id ? null : id);
   };
 
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+  };
+
   const filteredTransactions = walletState.transactions.filter(tx => {
     const matchesType = typeFilter === 'ALL' || tx.type === typeFilter;
     const matchesStatus = statusFilter === 'ALL' || tx.status === statusFilter;
     
-    const fullTxId = `8a9f3d7c5b6e2f1a9d4c8b3e5a7d9c1f2e4b6a8d0c2e4f6a8b1d3c5e7f9a2b1c${tx.id}`;
+    // Check against the full hash (tx.id is now the full hash)
+    const fullTxId = tx.id;
     const query = searchQuery.toLowerCase();
     
     const matchesSearch = !query || 
@@ -222,8 +227,8 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddr
         {/* Transactions List */}
         <div className="space-y-4">
             {filteredTransactions.map((tx) => {
-              // Construct a realistic looking hash from the ID
-              const fullTxId = `8a9f3d7c5b6e2f1a9d4c8b3e5a7d9c1f2e4b6a8d0c2e4f6a8b1d3c5e7f9a2b1c${tx.id}`;
+              // tx.id is now the full hash
+              const fullTxId = tx.id;
               const explorerUrl = network === 'TESTNET' 
                 ? `https://mempool.space/testnet4/tx/${fullTxId}` 
                 : `https://mempool.space/tx/${fullTxId}`;
@@ -383,7 +388,7 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddr
                             <Clock size={16} className="text-slate-500 mt-0.5" />
                             <div>
                                 <p className="text-xs text-slate-500 mb-0.5 font-medium">Timestamp</p>
-                                <p className="text-xs text-slate-300">{tx.date} • 14:30 PM (UTC)</p>
+                                <p className="text-xs text-slate-300">{tx.date} • {formatTime(tx.timestamp)}</p>
                             </div>
                          </div>
                          <div className="flex items-start space-x-3">

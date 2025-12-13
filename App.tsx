@@ -78,8 +78,8 @@ const App: React.FC = () => {
       const balance = await executeBitcoinCli('getbalance', [], network, context);
       setFetchedBalance(balance);
 
-      // Fetch Transactions
-      const transactions = await executeBitcoinCli('listtransactions', [], network, context);
+      // Fetch Transactions using listtransactions with count=20
+      const transactions = await executeBitcoinCli('listtransactions', ['*', '20'], network, context);
       setWalletState(prev => ({ ...prev, transactions }));
       
     } catch (e) {

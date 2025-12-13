@@ -8,33 +8,89 @@ interface WalletContext {
 // Key: "NETWORK:ADDRESS", Value: Transaction[]
 const TX_STORE: Record<string, Transaction[]> = {};
 
+const generateHash = () => {
+  const chars = '0123456789abcdef';
+  let result = '';
+  for (let i = 0; i < 64; i++) {
+    result += chars[Math.floor(Math.random() * 16)];
+  }
+  return result;
+};
+
 // Initial mock data generator (used only once per address)
 const generateInitialHistory = (address: string, network: Network): Transaction[] => {
-  const commonProps = {
-    confirmations: network === 'TESTNET' ? 120 : 6,
-    fee: 0.000015
-  };
+  if (!address) return [];
+  
+  const history: Transaction[] = [];
+  const now = Date.now();
+  const DAY_MS = 86400000;
+  const isTest = network === 'TESTNET';
 
-  if (address.startsWith('tb1p90') || address.startsWith('bc1q')) {
-     // Only give "genesis" funds to the simulated default/imported addresses
-     // to allow testing immediately.
-     const txId = Math.random().toString(36).substring(7);
-     return [
-      {
-        id: txId,
-        type: TransactionType.RECEIVE,
-        amount: network === 'TESTNET' ? 1.25 : 0.05,
-        fiatValue: 0,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        address: address,
-        status: TransactionStatus.COMPLETED,
-        ...commonProps,
-        inputs: [],
-        outputs: [{ address: address, amount: network === 'TESTNET' ? 1.25 : 0.05 }]
-      }
-    ];
-  }
-  return [];
+  // 1. Initial funding (Receive) - 30 days ago
+  history.push({
+    id: generateHash(),
+    type: TransactionType.RECEIVE,
+    amount: isTest ? 2.5 : 0.15,
+    fiatValue: 0,
+    date: new Date(now - 30 * DAY_MS).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    timestamp: now - 30 * DAY_MS,
+    address: address,
+    status: TransactionStatus.COMPLETED,
+    confirmations: 4320,
+    fee: 0,
+    inputs: [],
+    outputs: [{ address: address, amount: isTest ? 2.5 : 0.15 }]
+  });
+
+  // 2. Sent some funds - 15 days ago
+  history.push({
+    id: generateHash(),
+    type: TransactionType.SEND,
+    amount: isTest ? 0.5 : 0.01,
+    fiatValue: 0,
+    date: new Date(now - 15 * DAY_MS).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    timestamp: now - 15 * DAY_MS,
+    address: isTest ? 'tb1q...vendor' : 'bc1q...vendor',
+    status: TransactionStatus.COMPLETED,
+    confirmations: 2100,
+    fee: 0.000015,
+    inputs: [{ address: address, amount: isTest ? 0.500015 : 0.010015 }],
+    outputs: [{ address: isTest ? 'tb1q...vendor' : 'bc1q...vendor', amount: isTest ? 0.5 : 0.01 }]
+  });
+
+  // 3. Received small amount - 5 days ago
+  history.push({
+    id: generateHash(),
+    type: TransactionType.RECEIVE,
+    amount: isTest ? 0.25 : 0.005,
+    fiatValue: 0,
+    date: new Date(now - 5 * DAY_MS).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    timestamp: now - 5 * DAY_MS,
+    address: address,
+    status: TransactionStatus.COMPLETED,
+    confirmations: 720,
+    fee: 0,
+    inputs: [],
+    outputs: [{ address: address, amount: isTest ? 0.25 : 0.005 }]
+  });
+  
+  // 4. Pending Receive - Today (Recent)
+  history.push({
+    id: generateHash(),
+    type: TransactionType.RECEIVE,
+    amount: isTest ? 0.1 : 0.002,
+    fiatValue: 0,
+    date: new Date(now - 1000 * 60 * 5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), // 5 mins ago
+    timestamp: now - 1000 * 60 * 5,
+    address: address,
+    status: TransactionStatus.PENDING,
+    confirmations: 0,
+    fee: 0,
+    inputs: [],
+    outputs: [{ address: address, amount: isTest ? 0.1 : 0.002 }]
+  });
+
+  return history;
 };
 
 const getStoreKey = (network: Network, address: string) => `${network}:${address}`;
@@ -75,7 +131,7 @@ export const executeBitcoinCli = async (
 
   const currentAddress = context?.address || '';
   // Don't execute wallet commands without an address
-  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany'].includes(command.toLowerCase())) {
+  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo'].includes(command.toLowerCase())) {
      throw new Error("No wallet loaded. Please import or create a wallet.");
   }
 
@@ -86,17 +142,66 @@ export const executeBitcoinCli = async (
        return calculateBalance(history);
     
     case 'getnewaddress':
-       // In a real node, this generates a new one. Here we return current or a new fake one.
-       // For this simulation, we'll simply return the current to keep things simple, 
-       // or generate a random one if they want to 'switch' (but App state controls active addr).
        return currentAddress;
+    
+    case 'getaddressinfo':
+       // usage: getaddressinfo <address>
+       const targetAddr = args[0] || currentAddress;
+       if (!targetAddr) throw new Error("Usage: getaddressinfo <address>");
+
+       const isTaproot = targetAddr.startsWith('tb1p') || targetAddr.startsWith('bc1p');
+
+       return {
+         address: targetAddr,
+         scriptPubKey: isTaproot ? "5120" + Math.random().toString(16).substring(2).padEnd(60, '0') : "0014" + Math.random().toString(16).substring(2).padEnd(36, '0'),
+         ismine: targetAddr === currentAddress,
+         solvable: true,
+         desc: isTaproot ? `tr(${targetAddr})#checksum` : `wpkh(${targetAddr})#checksum`,
+         iswatchonly: false,
+         isscript: false,
+         iswitness: true,
+         witness_version: isTaproot ? 1 : 0,
+         witness_program: Math.random().toString(16).substring(2).padEnd(isTaproot ? 64 : 40, '0'),
+         pubkey: "02" + Math.random().toString(16).substring(2).padEnd(64, '0'),
+         ischange: false,
+         timestamp: Math.floor(Date.now() / 1000),
+         labels: targetAddr === currentAddress ? ["default"] : []
+       };
 
     case 'listtransactions':
-       // Return copy sorted by newest first
-       return [...history].reverse();
+       // usage: listtransactions <dummy_account> <count=10> <skip=0>
+       // Return newest first (reverse chronological)
+       const count = args[1] ? parseInt(args[1]) : 10;
+       const skip = args[2] ? parseInt(args[2]) : 0;
+       
+       const reversed = [...history].reverse();
+       return reversed.slice(skip, skip + count);
+
+    case 'listreceivedbyaddress':
+       // usage: listreceivedbyaddress [minconf=1] [include_empty=false]
+       const minconf = args.length > 0 ? parseInt(args[0]) : 1;
+       const includeEmpty = args.length > 1 ? (args[1] === 'true') : false;
+
+       const receivedTxs = history.filter(tx => 
+          tx.type === TransactionType.RECEIVE && 
+          (tx.confirmations || 0) >= minconf
+       );
+
+       const totalReceived = receivedTxs.reduce((sum, tx) => sum + tx.amount, 0);
+
+       const result = [];
+       if (totalReceived > 0 || includeEmpty) {
+          result.push({
+             address: currentAddress,
+             amount: totalReceived,
+             confirmations: 0,
+             label: "default",
+             txids: receivedTxs.map(tx => tx.id)
+          });
+       }
+       return result;
 
     case 'sendtoaddress':
-       // usage: sendtoaddress <address> <amount>
        if (args.length < 2) throw new Error("Usage: sendtoaddress <address> <amount>");
        
        const recipient = args[0];
@@ -111,14 +216,16 @@ export const executeBitcoinCli = async (
          throw new Error(`Insufficient funds. Balance: ${currentBal.toFixed(8)}, Required: ${(amount + fee).toFixed(8)}`);
        }
 
+       const nowSend = Date.now();
        const newTx: Transaction = {
-         id: Math.random().toString(36).substring(2, 10),
+         id: generateHash(),
          type: TransactionType.SEND,
          amount: amount,
-         fiatValue: 0, // Calculated in UI
-         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+         fiatValue: 0, 
+         date: new Date(nowSend).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+         timestamp: nowSend,
          address: recipient,
-         status: TransactionStatus.COMPLETED, // Simulating instant confirmation for UX
+         status: TransactionStatus.COMPLETED,
          fee: fee,
          confirmations: 0,
          inputs: [{ address: currentAddress, amount: amount + fee }],
@@ -130,23 +237,19 @@ export const executeBitcoinCli = async (
        return newTx.id;
 
     case 'generatetoaddress':
-        // usage: generatetoaddress <nblocks> <address>
-        // Use this to add funds in simulation
         const nBlocks = parseInt(args[0]) || 1;
         const rewardAddr = args[1] || currentAddress;
-        
-        // Block reward simulation (e.g. 50 BTC regtest style, or small for testnet)
         const rewardAmount = 6.25 * nBlocks; 
 
-        // We only add to history if it matches our current context for this simple app
-        // (Since we don't strictly separate wallet vs node, we just add a RECEIVE tx)
         if (rewardAddr === currentAddress) {
+            const nowGen = Date.now();
             const coinbasetx: Transaction = {
-                id: Math.random().toString(36).substring(2, 10),
+                id: generateHash(),
                 type: TransactionType.RECEIVE,
                 amount: rewardAmount,
                 fiatValue: 0,
-                date: new Date().toLocaleDateString(),
+                date: new Date(nowGen).toLocaleDateString(),
+                timestamp: nowGen,
                 address: "coinbase",
                 status: TransactionStatus.COMPLETED,
                 confirmations: 1,
@@ -154,22 +257,13 @@ export const executeBitcoinCli = async (
             };
             history.push(coinbasetx);
             saveHistory(network, currentAddress, history);
-            return [coinbasetx.id]; // CLI returns list of hashes
+            return [coinbasetx.id];
         }
         return [];
 
     case 'sendmany':
-        // usage: sendmany "" {"address": amount, ...}
-        // args[0] is account (ignored/empty), args[1] is JSON string or object
-        // In console user types: sendmany "" {"tb1...": 0.1, "tb1...": 0.2}
-        // Arguments coming from Console might be split by spaces, so parsing JSON is tricky if done simply.
-        // But our Airdrop component passes an object directly if we allow it, 
-        // OR we stringify it. The `executeBitcoinCli` signature says `args: string[]`.
-        // We will assume Airdrop component passes [ "", JSON.stringify(map) ]
-        
         let outputs = {};
         try {
-            // Join back if it was split by spaces erroneously by caller, or expect correct entry
             const jsonStr = args.slice(1).join(' '); 
             outputs = JSON.parse(jsonStr);
         } catch (e) {
@@ -187,14 +281,14 @@ export const executeBitcoinCli = async (
              throw new Error(`Insufficient funds for sendmany. Need ${(totalSend + manyFee).toFixed(8)}`);
         }
 
-        // Create one large transaction or many small ones? 
-        // sendmany creates one TX with multiple outputs.
+        const nowMany = Date.now();
         const sendManyTx: Transaction = {
-            id: Math.random().toString(36).substring(2, 10),
+            id: generateHash(),
             type: TransactionType.SEND,
             amount: totalSend,
             fiatValue: 0,
-            date: new Date().toLocaleDateString(),
+            date: new Date(nowMany).toLocaleDateString(),
+            timestamp: nowMany,
             address: "Multiple Recipients",
             status: TransactionStatus.COMPLETED,
             fee: manyFee,
@@ -222,7 +316,6 @@ export const executeBitcoinCli = async (
       };
 
     default:
-       // Fallback for visual commands that don't need state
        return null;
   }
 };
