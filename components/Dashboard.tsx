@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowUpRight, ArrowDownLeft, Copy, Send, QrCode, Check, Filter, X, ChevronDown, ChevronUp, Hash, Activity, Clock, ExternalLink, Trash2, ArrowRight, RefreshCw, Search, Wallet } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Copy, Send, QrCode, Check, Filter, X, ChevronDown, ChevronUp, Hash, Activity, Clock, ExternalLink, Trash2, ArrowRight, RefreshCw, Search, Wallet, Key } from 'lucide-react';
 import { WalletState, TransactionType, TransactionStatus, Network, AppView } from '../types';
 
 interface DashboardProps {
@@ -20,9 +20,9 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddr
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleCopy = () => {
-    if (!currentAddress) return;
-    navigator.clipboard.writeText(currentAddress);
+  const handleCopy = (text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -71,6 +71,8 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddr
     </button>
   );
 
+  const satsBalance = Math.floor(walletState.btcBalance * 100_000_000);
+
   return (
     <div className="space-y-8 animate-fade-in max-w-4xl mx-auto">
       {/* Balance Card */}
@@ -81,21 +83,24 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddr
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-black/5 rounded-full translate-x-1/2 translate-y-1/2 blur-3xl"></div>
 
         <div className="relative z-10 flex flex-col items-center">
-          <p className="text-orange-100 font-medium text-lg mb-6">Total Balance</p>
+          <p className="text-orange-100 font-medium text-lg mb-4">Total Balance</p>
           
           <div className="mb-2">
              <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
                ₿ {currentAddress ? walletState.btcBalance.toFixed(8) : '0.00000000'}
              </h1>
+             <p className="text-orange-100/70 font-mono text-sm mt-2">
+               {currentAddress ? satsBalance.toLocaleString() : '0'} {network === 'TESTNET' ? 't-sat' : 'sats'}
+             </p>
           </div>
           
-          <p className="text-orange-100/90 text-lg mb-8">
+          <p className="text-orange-100/90 text-lg mb-8 mt-2">
             ≈ ${currentAddress ? walletState.fiatBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} USD
           </p>
 
           {/* Address Box */}
           <button 
-            onClick={handleCopy}
+            onClick={() => handleCopy(currentAddress)}
             disabled={!currentAddress}
             className={`group bg-black/10 hover:bg-black/20 backdrop-blur-sm rounded-xl px-5 py-3 mb-10 flex items-center space-x-3 transition-all duration-200 ${!currentAddress ? 'cursor-not-allowed opacity-70' : ''}`}
           >
@@ -126,6 +131,48 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddr
           </div>
         </div>
       </div>
+
+      {/* Wallet Addresses List */}
+      {walletState.addressBalances.length > 0 && (
+         <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-white px-2">Wallet Addresses</h3>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl overflow-hidden">
+                {walletState.addressBalances.map((item, idx) => (
+                    <div key={idx} className="p-4 border-b border-slate-700/50 last:border-0 flex items-center justify-between hover:bg-slate-700/30 transition-colors group">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center">
+                                <Key size={20} />
+                            </div>
+                            <div>
+                                <div className="flex items-center space-x-2">
+                                    <p className="font-medium text-slate-200">{item.label || 'Unknown Label'}</p>
+                                    {item.address === currentAddress && (
+                                        <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">Active</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center space-x-2 mt-0.5">
+                                    <p className="text-xs font-mono text-slate-500">{formatAddress(item.address)}</p>
+                                    <button 
+                                        onClick={() => handleCopy(item.address)} 
+                                        className="text-slate-600 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all"
+                                        title="Copy Address"
+                                    >
+                                        <Copy size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-bold text-slate-200">{item.amount.toFixed(8)} BTC</p>
+                            <p className="text-xs text-slate-500">
+                                {Math.floor(item.amount * 100_000_000).toLocaleString()} {network === 'TESTNET' ? 't-sat' : 'sats'}
+                            </p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+         </div>
+      )}
 
       {/* Recent Transactions Header & Search */}
       <div className="space-y-4">

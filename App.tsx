@@ -12,7 +12,8 @@ import { executeBitcoinCli } from './services/bitcoinCli';
 const INITIAL_WALLET_STATE: WalletState = {
   btcBalance: 0,
   fiatBalance: 0,
-  transactions: []
+  transactions: [],
+  addressBalances: []
 };
 
 // Simple pseudo-random hash for simulation purposes
@@ -80,7 +81,11 @@ const App: React.FC = () => {
 
       // Fetch Transactions using listtransactions with count=20
       const transactions = await executeBitcoinCli('listtransactions', ['*', '20'], network, context);
-      setWalletState(prev => ({ ...prev, transactions }));
+      
+      // Fetch Address Balances
+      const addressBalances = await executeBitcoinCli('listaddressgroupings', [], network, context);
+
+      setWalletState(prev => ({ ...prev, transactions, addressBalances }));
       
     } catch (e) {
       console.error("Failed to sync with node:", e);

@@ -131,7 +131,7 @@ export const executeBitcoinCli = async (
 
   const currentAddress = context?.address || '';
   // Don't execute wallet commands without an address
-  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo'].includes(command.toLowerCase())) {
+  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo', 'listaddressgroupings'].includes(command.toLowerCase())) {
      throw new Error("No wallet loaded. Please import or create a wallet.");
   }
 
@@ -143,6 +143,16 @@ export const executeBitcoinCli = async (
     
     case 'getnewaddress':
        return currentAddress;
+
+    case 'listaddressgroupings':
+       // Simulate returning the active address and its balance
+       // In a real scenario, this would group UTXOs by address
+       const mainBalance = calculateBalance(history);
+       return [{
+           address: currentAddress,
+           amount: mainBalance,
+           label: "Primary"
+       }];
     
     case 'getaddressinfo':
        // usage: getaddressinfo <address>

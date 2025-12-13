@@ -37,10 +37,17 @@ export interface Transaction {
   outputs?: TransactionInputOutput[];
 }
 
+export interface AddressBalance {
+  address: string;
+  amount: number;
+  label?: string;
+}
+
 export interface WalletState {
   btcBalance: number;
   fiatBalance: number;
   transactions: Transaction[];
+  addressBalances: AddressBalance[];
 }
 
 export interface ChatMessage {
