@@ -159,7 +159,14 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate 
 
         {/* Transactions List */}
         <div className="space-y-4">
-            {filteredTransactions.map((tx) => (
+            {filteredTransactions.map((tx) => {
+              // Construct a realistic looking hash from the ID
+              const fullTxId = `8a9f3d7c5b6e2f1a9d4c8b3e5a7d9c1f2e4b6a8d0c2e4f6a8b1d3c5e7f9a2b1c${tx.id}`;
+              const explorerUrl = network === 'TESTNET' 
+                ? `https://mempool.space/testnet4/tx/${fullTxId}` 
+                : `https://mempool.space/tx/${fullTxId}`;
+
+              return (
               <div key={tx.id} className="bg-slate-800/50 border border-slate-700/50 rounded-2xl overflow-hidden transition-all duration-200 hover:border-slate-600">
                 <div 
                   className="p-4 flex items-center justify-between cursor-pointer"
@@ -233,8 +240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate 
                             <div className="min-w-0">
                                 <p className="text-xs text-slate-500 mb-0.5">Transaction ID</p>
                                 <p className="text-xs font-mono text-slate-300 break-all leading-relaxed">
-                                  {/* Mock TXID */}
-                                  8a9f3d7c5b6e2f1a9d4c8b3e5a7d9c1f2e4b6a8d0c2e4f6a8b1d3c5e7f9a2b1c{tx.id}
+                                  {fullTxId}
                                 </p>
                             </div>
                          </div>
@@ -270,9 +276,10 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate 
                     
                     <div className="mt-4 pt-3 border-t border-slate-800 flex justify-end">
                        <a 
-                         href="#" 
+                         href={explorerUrl}
+                         target="_blank"
+                         rel="noopener noreferrer"
                          className="text-xs text-amber-500 hover:text-amber-400 flex items-center space-x-1 transition-colors"
-                         onClick={(e) => e.preventDefault()}
                        >
                          <span>View on Blockchain Explorer</span>
                          <ExternalLink size={12} />
@@ -281,7 +288,8 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate 
                   </div>
                 )}
               </div>
-            ))}
+            );
+            })}
             {filteredTransactions.length === 0 && (
               <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl">
                 <p className="text-slate-500 mb-2">No transactions found matching your filters.</p>

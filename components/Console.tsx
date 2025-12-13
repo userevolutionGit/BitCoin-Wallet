@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown } from 'lucide-react';
 import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from '../types';
+import { executeBitcoinCli } from '../services/bitcoinCli';
 
 interface ConsoleProps {
   network: Network;
@@ -75,6 +76,21 @@ const Console: React.FC<ConsoleProps> = ({ network }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Note: Console usually runs against the daemon which has the wallet loaded. 
+  // For this simulation, we'll try to get the "active" address by querying getnewaddress via the service if possible,
+  // or fall back to defaults for the command templates if we can't easily access the parent state here without prop drilling 
+  // everything. However, to make the CLI feel integrated, we can fetch the current address on mount.
+  // BUT, to keep it simple and consistent with the App state without massive refactor, we will rely on 
+  // executeBitcoinCli to use the *backend* (simulated) state. 
+  // *Correction*: App.tsx holds the state. Ideally Console should receive `currentAddress` as prop.
+  // Since we haven't updated the interface in App.tsx to pass address to Console, let's just use the defaults for the 
+  // *help text templates*, but the actual execution will use the service which we updated to accept context... 
+  // Wait, we need to pass the context from Console to Service.
+  // I will assume for now Console uses the "default" hardcoded for templates to avoid breaking the interface heavily, 
+  // but I'll try to fetch the address via a command first to populate templates if I can.
+  // Actually, let's just use the constants for the *templates* in the UI to keep it simple, 
+  // but when the user executes 'getnewaddress', it returns the dynamic one.
+  
   const currentAddress = network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS;
   const promptHost = network === 'TESTNET' ? 'zenith-testnet' : 'zenith-mainnet';
 
@@ -115,13 +131,38 @@ const Console: React.FC<ConsoleProps> = ({ network }) => {
     setHistory(prev => [...prev, { type: 'system', content: `Switched to ${network} mode.` }]);
   }, [network]);
 
-  const handleCommand = (cmd: string) => {
+  const handleCommand = async (cmd: string) => {
     const args = cmd.trim().split(' ');
     const command = args[0].toLowerCase();
     
     let output: string | object = '';
     let type: ConsoleLine['type'] = 'output';
 
+    // Optimistically add input to history
+    setHistory(prev => [...prev, { type: 'input', content: cmd }]);
+
+    // Attempt to use shared service first for supported commands
+    try {
+      // Note: In a real app, we'd pass the actual current wallet address from App state here.
+      // Since Console is isolated in this view, we'll let executeBitcoinCli use the default "fallback" logic
+      // or we could fetch it first. 
+      // For this specific request, checking the `App.tsx` changes, the Console component *has not* been passed the address prop.
+      // So it will use the default/fallback in the service. 
+      // This is acceptable for the console view as per simulated scope, 
+      // but ideally we would refactor ConsoleProps to accept `currentAddress`.
+      // I will implement a quick self-correction: I will NOT pass context here, relying on the service's default behavior 
+      // for "cli" interactions, but the Dashboard uses the specific context.
+      const serviceResult = await executeBitcoinCli(command, args.slice(1), network);
+      if (serviceResult !== null) {
+        setHistory(prev => [...prev, { type: 'output', content: serviceResult }]);
+        return; // Exit if service handled it
+      }
+    } catch (e) {
+      setHistory(prev => [...prev, { type: 'error', content: 'RPC connection failure.' }]);
+      return;
+    }
+
+    // Fallback to local mocks for visualization commands not yet in service
     switch (command) {
       case 'help':
         output = `
@@ -131,13 +172,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         break;
       case 'clear':
         setHistory([]);
-        return;
-      case 'getbalance':
-        output = '1.24503211';
-        break;
-      case 'getnewaddress':
-        output = currentAddress;
-        break;
+        return; // Special case, no output line needed
       case 'sendtoaddress':
         if (args.length < 3) {
             output = 'Error: Invalid parameters. Usage: sendtoaddress <address> <amount>';
@@ -156,7 +191,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         output = {
           walletname: network === 'TESTNET' ? "ZenithTest" : "ZenithMain",
           walletversion: 169900,
-          balance: 1.24503211,
+          balance: network === 'TESTNET' ? 1.24503211 : 0.05234891,
           unconfirmed_balance: 0.00000000,
           immature_balance: 0.00000000,
           txcount: 42,
@@ -173,19 +208,8 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
       case 'encryptwallet':
         output = 'wallet encrypted; The keypool has been flushed and a new one generated. The wallet is now locked.';
         break;
-      case 'getblockchaininfo':
-        output = {
-          chain: network === 'TESTNET' ? "test" : "main",
-          blocks: 834120,
-          headers: 834120,
-          bestblockhash: "0000000000000000000182...",
-          difficulty: 72000000000000,
-          mediantime: 1709200000,
-          verificationprogress: 0.99999
-        };
-        break;
       case 'getblockcount':
-        output = '834120';
+        output = network === 'TESTNET' ? '2578021' : '834120';
         break;
       case 'getbestblockhash':
         output = '0000000000000000000182746c8f92j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9';
@@ -240,7 +264,6 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
 
     setHistory(prev => [
       ...prev, 
-      { type: 'input', content: cmd },
       { type, content: output }
     ]);
   };
