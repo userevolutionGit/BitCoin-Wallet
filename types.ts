@@ -1,6 +1,8 @@
-export const DEFAULT_ADDRESS = 'tb1p90a7f3d12d4eaf03f2bcbff3b021ac6427c01d42435b3be5f43686c24e';
-export const TESTNET_ADDRESS = DEFAULT_ADDRESS;
-export const MAINNET_ADDRESS = DEFAULT_ADDRESS;
+
+export const DEFAULT_ADDRESS = '';
+export const TESTNET_ADDRESS = '';
+export const MAINNET_ADDRESS = '';
+export const EXAMPLE_ADDRESS = 'tb1p90a7f3d12d4eaf03f2bcbff3b021ac6427c01d42435b3be5f43686c24e';
 
 export type Network = 'MAINNET' | 'TESTNET';
 

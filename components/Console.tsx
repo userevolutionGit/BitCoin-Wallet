@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown, Wallet } from 'lucide-react';
-import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from '../types';
+import { EXAMPLE_ADDRESS, Network } from '../types';
 import { executeBitcoinCli } from '../services/bitcoinCli';
 
 interface ConsoleProps {
   network: Network;
+  currentAddress: string;
 }
 
 interface ConsoleLine {
@@ -67,7 +68,7 @@ const JsonRenderer: React.FC<{ value: any; root?: boolean }> = ({ value, root = 
   );
 };
 
-const Console: React.FC<ConsoleProps> = ({ network }) => {
+const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
   const [history, setHistory] = useState<ConsoleLine[]>([
     { type: 'system', content: `Zenith Bitcoin Core RPC client version v26.0.0 (${network})` },
     { type: 'system', content: 'Type "help" for an overview of available commands.' }
@@ -76,29 +77,14 @@ const Console: React.FC<ConsoleProps> = ({ network }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Note: Console usually runs against the daemon which has the wallet loaded. 
-  // For this simulation, we'll try to get the "active" address by querying getnewaddress via the service if possible,
-  // or fall back to defaults for the command templates if we can't easily access the parent state here without prop drilling 
-  // everything. However, to make the CLI feel integrated, we can fetch the current address on mount.
-  // BUT, to keep it simple and consistent with the App state without massive refactor, we will rely on 
-  // executeBitcoinCli to use the *backend* (simulated) state. 
-  // *Correction*: App.tsx holds the state. Ideally Console should receive `currentAddress` as prop.
-  // Since we haven't updated the interface in App.tsx to pass address to Console, let's just use the defaults for the 
-  // *help text templates*, but the actual execution will use the service which we updated to accept context... 
-  // Wait, we need to pass the context from Console to Service.
-  // I will assume for now Console uses the "default" hardcoded for templates to avoid breaking the interface heavily, 
-  // but I'll try to fetch the address via a command first to populate templates if I can.
-  // Actually, let's just use the constants for the *templates* in the UI to keep it simple, 
-  // but when the user executes 'getnewaddress', it returns the dynamic one.
-  
-  const currentAddress = network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS;
+  const placeholderAddress = currentAddress || EXAMPLE_ADDRESS;
   const promptHost = network === 'TESTNET' ? 'zenith-testnet' : 'zenith-mainnet';
 
   const COMMAND_GROUPS = {
     Wallet: [
       { cmd: 'getbalance', args: false },
       { cmd: 'getnewaddress', args: false },
-      { cmd: 'sendtoaddress', args: true, template: `sendtoaddress ${currentAddress} 0.001` },
+      { cmd: 'sendtoaddress', args: true, template: `sendtoaddress ${placeholderAddress} 0.001` },
       { cmd: 'listunspent', args: false },
       { cmd: 'getwalletinfo', args: false },
       { cmd: 'dumpwallet', args: true, template: 'dumpwallet wallet.dat' },
@@ -118,7 +104,7 @@ const Console: React.FC<ConsoleProps> = ({ network }) => {
       { cmd: 'sendrawtransaction', args: true, template: 'sendrawtransaction 0200...' },
       { cmd: 'getrawtransaction', args: true, template: 'getrawtransaction <txid>' },
       { cmd: 'estimatesmartfee', args: true, template: 'estimatesmartfee 6' },
-      { cmd: 'validateaddress', args: true, template: `validateaddress ${currentAddress}` },
+      { cmd: 'validateaddress', args: true, template: `validateaddress ${placeholderAddress}` },
     ]
   };
 
@@ -143,22 +129,13 @@ const Console: React.FC<ConsoleProps> = ({ network }) => {
 
     // Attempt to use shared service first for supported commands
     try {
-      // Note: In a real app, we'd pass the actual current wallet address from App state here.
-      // Since Console is isolated in this view, we'll let executeBitcoinCli use the default "fallback" logic
-      // or we could fetch it first. 
-      // For this specific request, checking the `App.tsx` changes, the Console component *has not* been passed the address prop.
-      // So it will use the default/fallback in the service. 
-      // This is acceptable for the console view as per simulated scope, 
-      // but ideally we would refactor ConsoleProps to accept `currentAddress`.
-      // I will implement a quick self-correction: I will NOT pass context here, relying on the service's default behavior 
-      // for "cli" interactions, but the Dashboard uses the specific context.
-      const serviceResult = await executeBitcoinCli(command, args.slice(1), network);
+      const serviceResult = await executeBitcoinCli(command, args.slice(1), network, { address: currentAddress });
       if (serviceResult !== null) {
         setHistory(prev => [...prev, { type: 'output', content: serviceResult }]);
         return; // Exit if service handled it
       }
-    } catch (e) {
-      setHistory(prev => [...prev, { type: 'error', content: 'RPC connection failure.' }]);
+    } catch (e: any) {
+      setHistory(prev => [...prev, { type: 'error', content: e.message || 'RPC connection failure.' }]);
       return;
     }
 
@@ -174,17 +151,18 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         setHistory([]);
         return; // Special case, no output line needed
       case 'sendtoaddress':
+        // Fallback if service failed for some reason
         if (args.length < 3) {
             output = 'Error: Invalid parameters. Usage: sendtoaddress <address> <amount>';
             type = 'error';
         } else {
-            output = 'txid: ' + Math.random().toString(16).substring(2) + Math.random().toString(16).substring(2) + Math.random().toString(16).substring(2);
+            output = 'txid: ' + Math.random().toString(16).substring(2);
         }
         break;
       case 'listunspent':
         output = [
-          { txid: "d4f3...", vout: 0, address: currentAddress, amount: 0.50000000, confirmations: 120 },
-          { txid: "a1b2...", vout: 1, address: currentAddress, amount: 0.74503211, confirmations: 6 }
+          { txid: "d4f3...", vout: 0, address: placeholderAddress, amount: 0.50000000, confirmations: 120 },
+          { txid: "a1b2...", vout: 1, address: placeholderAddress, amount: 0.74503211, confirmations: 6 }
         ];
         break;
       case 'getwalletinfo':
@@ -251,7 +229,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
       case 'validateaddress':
         output = {
           isvalid: true,
-          address: args[1] || currentAddress,
+          address: args[1] || placeholderAddress,
           scriptPubKey: "5120...",
           isscript: false,
           iswitness: true

@@ -270,6 +270,7 @@ const App: React.FC = () => {
               <Dashboard 
                 walletState={displayedWalletState} 
                 network={network} 
+                currentAddress={currentAddress}
                 onNavigate={handleNavigate}
                 onClearTransactions={handleClearTransactions}
                 onRefresh={refreshWalletData}
@@ -279,7 +280,7 @@ const App: React.FC = () => {
             {currentView === AppView.SEND && <SendForm network={network} currentAddress={currentAddress} />}
             {currentView === AppView.AIRDROP && <Airdrop network={network} currentAddress={currentAddress} />}
             {currentView === AppView.ADVISOR && <GeminiAdvisor />}
-            {currentView === AppView.CLI && <Console network={network} />}
+            {currentView === AppView.CLI && <Console network={network} currentAddress={currentAddress} />}
             {currentView === AppView.RECEIVE && (
               <div className="flex flex-col items-center justify-center h-full space-y-8 animate-fade-in">
                 <div className="text-center">

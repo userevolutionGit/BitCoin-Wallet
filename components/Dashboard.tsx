@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { ArrowUpRight, ArrowDownLeft, Copy, Send, QrCode, Check, Filter, X, ChevronDown, ChevronUp, Hash, Activity, Clock, ExternalLink, Trash2, ArrowRight, RefreshCw, Search } from 'lucide-react';
-import { WalletState, TransactionType, TransactionStatus, Network, TESTNET_ADDRESS, MAINNET_ADDRESS, AppView } from '../types';
+import { ArrowUpRight, ArrowDownLeft, Copy, Send, QrCode, Check, Filter, X, ChevronDown, ChevronUp, Hash, Activity, Clock, ExternalLink, Trash2, ArrowRight, RefreshCw, Search, Wallet } from 'lucide-react';
+import { WalletState, TransactionType, TransactionStatus, Network, AppView } from '../types';
 
 interface DashboardProps {
   walletState: WalletState;
   network: Network;
+  currentAddress: string;
   onNavigate: (view: AppView) => void;
   onClearTransactions: () => void;
   onRefresh: () => void;
   isRefreshing: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate, onClearTransactions, onRefresh, isRefreshing }) => {
+const Dashboard: React.FC<DashboardProps> = ({ walletState, network, currentAddress, onNavigate, onClearTransactions, onRefresh, isRefreshing }) => {
   const [copied, setCopied] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
@@ -19,15 +20,15 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const currentAddress = network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS;
-
   const handleCopy = () => {
+    if (!currentAddress) return;
     navigator.clipboard.writeText(currentAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const formatAddress = (addr: string) => {
+    if (!addr) return 'Not Configured';
     if (addr.length < 24) return addr;
     return `${addr.substring(0, 10)}...${addr.substring(addr.length - 10)}`;
   };
@@ -79,37 +80,40 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
           
           <div className="mb-2">
              <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
-               ₿ {walletState.btcBalance.toFixed(8)}
+               ₿ {currentAddress ? walletState.btcBalance.toFixed(8) : '0.00000000'}
              </h1>
           </div>
           
           <p className="text-orange-100/90 text-lg mb-8">
-            ≈ ${walletState.fiatBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+            ≈ ${currentAddress ? walletState.fiatBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} USD
           </p>
 
           {/* Address Box */}
           <button 
             onClick={handleCopy}
-            className="group bg-black/10 hover:bg-black/20 backdrop-blur-sm rounded-xl px-5 py-3 mb-10 flex items-center space-x-3 transition-all duration-200"
+            disabled={!currentAddress}
+            className={`group bg-black/10 hover:bg-black/20 backdrop-blur-sm rounded-xl px-5 py-3 mb-10 flex items-center space-x-3 transition-all duration-200 ${!currentAddress ? 'cursor-not-allowed opacity-70' : ''}`}
           >
              <span className="font-mono text-white/90 text-sm md:text-base tracking-wide">
-               {formatAddress(currentAddress)}
+               {currentAddress ? formatAddress(currentAddress) : 'No Wallet Configured'}
              </span>
-             {copied ? <Check size={18} className="text-white" /> : <Copy size={18} className="text-white/70 group-hover:text-white" />}
+             {currentAddress && (copied ? <Check size={18} className="text-white" /> : <Copy size={18} className="text-white/70 group-hover:text-white" />)}
           </button>
 
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
              <button 
                onClick={() => onNavigate(AppView.SEND)}
-               className="bg-white text-[#F7931A] hover:bg-orange-50 font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-2 transition-colors shadow-lg shadow-black/5"
+               disabled={!currentAddress}
+               className="bg-white text-[#F7931A] hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-2 transition-colors shadow-lg shadow-black/5"
              >
                <Send size={20} className="transform -rotate-45 mb-1" />
                <span>Send</span>
              </button>
              <button 
                onClick={() => onNavigate(AppView.RECEIVE)}
-               className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-2 transition-colors"
+               disabled={!currentAddress}
+               className="bg-white/20 hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-md text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center space-x-2 transition-colors"
              >
                <QrCode size={20} />
                <span>Receive</span>
@@ -140,7 +144,7 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
                 
                 <button 
                     onClick={onRefresh}
-                    disabled={isRefreshing}
+                    disabled={isRefreshing || !currentAddress}
                     className={`p-2 rounded-md transition-colors flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed ${isRefreshing ? 'animate-spin text-amber-500' : ''}`}
                     title="Refresh from Network"
                 >
@@ -411,30 +415,36 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
             {walletState.transactions.length === 0 && (
               <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl">
                 <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Activity className="text-slate-500" size={24} />
+                    {currentAddress ? <Activity className="text-slate-500" size={24} /> : <Wallet className="text-slate-500" size={24} />}
                 </div>
-                <h3 className="text-slate-300 font-medium mb-1">No Transactions Found</h3>
+                <h3 className="text-slate-300 font-medium mb-1">
+                  {currentAddress ? 'No Transactions Found' : 'Wallet Not Configured'}
+                </h3>
                 <p className="text-slate-500 text-sm mb-4">
-                    {searchQuery ? `No results for "${searchQuery}"` : "Your history is currently empty or filtered out."}
+                    {currentAddress 
+                      ? (searchQuery ? `No results for "${searchQuery}"` : "Your history is currently empty or filtered out.")
+                      : "Please import or create a wallet to see your history."}
                 </p>
                 
-                <div className="flex justify-center space-x-4">
-                    {(typeFilter !== 'ALL' || statusFilter !== 'ALL' || searchQuery) && (
-                        <button 
-                        onClick={() => { setTypeFilter('ALL'); setStatusFilter('ALL'); setSearchQuery(''); }}
-                        className="text-amber-500 hover:text-amber-400 text-sm font-medium"
-                        >
-                        Clear Filters & Search
-                        </button>
-                    )}
-                    <button 
-                        onClick={onRefresh}
-                        className="text-indigo-400 hover:text-indigo-300 text-sm font-medium flex items-center space-x-1"
-                    >
-                        <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-                        <span>Refresh List</span>
-                    </button>
-                </div>
+                {currentAddress && (
+                  <div className="flex justify-center space-x-4">
+                      {(typeFilter !== 'ALL' || statusFilter !== 'ALL' || searchQuery) && (
+                          <button 
+                          onClick={() => { setTypeFilter('ALL'); setStatusFilter('ALL'); setSearchQuery(''); }}
+                          className="text-amber-500 hover:text-amber-400 text-sm font-medium"
+                          >
+                          Clear Filters & Search
+                          </button>
+                      )}
+                      <button 
+                          onClick={onRefresh}
+                          className="text-indigo-400 hover:text-indigo-300 text-sm font-medium flex items-center space-x-1"
+                      >
+                          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+                          <span>Refresh List</span>
+                      </button>
+                  </div>
+                )}
               </div>
             )}
         </div>

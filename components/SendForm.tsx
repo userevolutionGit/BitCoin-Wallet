@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { ShieldCheck, AlertTriangle, Send as SendIcon, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, AlertTriangle, Send as SendIcon, CheckCircle2, BookUser, Search, Plus, X, Trash2, User } from 'lucide-react';
 import { analyzeTransactionRisk } from '../services/geminiService';
-import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from '../types';
+import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network, Contact } from '../types';
 import { executeBitcoinCli } from '../services/bitcoinCli';
 
 interface SendFormProps {
   network: Network;
   currentAddress: string;
 }
+
+const STORAGE_KEY = 'zenith_wallet_contacts';
 
 const SendForm: React.FC<SendFormProps> = ({ network, currentAddress }) => {
   const [address, setAddress] = useState('');
@@ -19,8 +21,68 @@ const SendForm: React.FC<SendFormProps> = ({ network, currentAddress }) => {
   const [error, setError] = useState<string>('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
+  // Address Book State
+  const [showAddressBook, setShowAddressBook] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactSearch, setContactSearch] = useState('');
+  const [isAddingContact, setIsAddingContact] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactAddress, setNewContactAddress] = useState('');
+
   // Use the active address if available, otherwise fallback (for placeholder text)
   const currentPlaceholder = currentAddress || (network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS);
+
+  // Load contacts on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        setContacts(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse contacts", e);
+      }
+    }
+  }, []);
+
+  const updateContacts = (newContacts: Contact[]) => {
+    setContacts(newContacts);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newContacts));
+  };
+
+  const handleAddContact = () => {
+    if (!newContactName || !newContactAddress) return;
+    
+    const newContact: Contact = {
+      id: Date.now().toString(),
+      name: newContactName,
+      address: newContactAddress,
+      network
+    };
+
+    updateContacts([...contacts, newContact]);
+    setNewContactName('');
+    setNewContactAddress('');
+    setIsAddingContact(false);
+  };
+
+  const handleDeleteContact = (id: string) => {
+    updateContacts(contacts.filter(c => c.id !== id));
+  };
+
+  const handleSelectContact = (contactAddress: string) => {
+    setAddress(contactAddress);
+    setShowAddressBook(false);
+  };
+
+  const openAddressBook = () => {
+    // If the user typed an address but hasn't saved it, pre-fill the add form
+    if (address && !contacts.some(c => c.address === address)) {
+        setNewContactAddress(address);
+    } else {
+        setNewContactAddress('');
+    }
+    setShowAddressBook(true);
+  };
 
   const handleAnalyze = async () => {
     if (!address) return;
@@ -59,6 +121,12 @@ const SendForm: React.FC<SendFormProps> = ({ network, currentAddress }) => {
     setError('');
   };
 
+  const filteredContacts = contacts.filter(c => 
+    c.network === network && 
+    (c.name.toLowerCase().includes(contactSearch.toLowerCase()) || 
+     c.address.toLowerCase().includes(contactSearch.toLowerCase()))
+  );
+
   if (step === 'success') {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6 animate-fade-in">
@@ -95,13 +163,22 @@ const SendForm: React.FC<SendFormProps> = ({ network, currentAddress }) => {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">Recipient Address</label>
-              <input 
-                type="text" 
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder={currentPlaceholder}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all placeholder:text-slate-600"
-              />
+              <div className="relative">
+                <input 
+                    type="text" 
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder={currentPlaceholder}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-4 pr-12 py-3 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all placeholder:text-slate-600"
+                />
+                <button 
+                    onClick={openAddressBook}
+                    className="absolute right-3 top-3 text-slate-500 hover:text-amber-500 transition-colors p-1 rounded-md hover:bg-slate-800"
+                    title="Address Book"
+                >
+                    <BookUser size={20} />
+                </button>
+              </div>
             </div>
             
             <div>
@@ -239,6 +316,108 @@ const SendForm: React.FC<SendFormProps> = ({ network, currentAddress }) => {
                  ) : "Broadcast Now"}
                </button>
              </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address Book Modal */}
+      {showAddressBook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900 rounded-t-2xl">
+              <h3 className="font-bold text-white flex items-center">
+                <BookUser className="mr-2 text-amber-500" size={20} />
+                Address Book
+              </h3>
+              <button onClick={() => setShowAddressBook(false)} className="text-slate-500 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-slate-800">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 text-slate-500 w-4 h-4" />
+                <input 
+                  type="text" 
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  placeholder="Search contacts..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:ring-1 focus:ring-amber-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[200px]">
+              {filteredContacts.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                    <p>No contacts found for {network}.</p>
+                </div>
+              ) : (
+                filteredContacts.map(contact => (
+                  <div key={contact.id} className="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-800/50 transition-colors group">
+                    <div 
+                        className="flex items-center space-x-3 flex-1 min-w-0 cursor-pointer"
+                        onClick={() => handleSelectContact(contact.address)}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                        {contact.name.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-medium text-slate-200 truncate">{contact.name}</h4>
+                        <p className="text-xs text-slate-500 truncate font-mono">{contact.address}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteContact(contact.id)}
+                      className="p-2 text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-800/50 border-t border-slate-800 rounded-b-2xl">
+              {!isAddingContact ? (
+                <button 
+                  onClick={() => setIsAddingContact(true)}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium border border-dashed border-slate-600 hover:border-slate-500 flex items-center justify-center transition-colors"
+                >
+                  <Plus size={16} className="mr-2" />
+                  Add New Contact
+                </button>
+              ) : (
+                <div className="space-y-3 animate-in slide-in-from-bottom-2">
+                  <div className="flex justify-between items-center mb-2">
+                     <span className="text-xs font-semibold text-slate-400 uppercase">New Contact</span>
+                     <button onClick={() => setIsAddingContact(false)} className="text-xs text-slate-500 hover:text-white">Cancel</button>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    placeholder="Name (e.g. Alice)"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                    autoFocus
+                  />
+                  <input 
+                    type="text" 
+                    value={newContactAddress}
+                    onChange={(e) => setNewContactAddress(e.target.value)}
+                    placeholder="Address (bc1q...)"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none font-mono"
+                  />
+                  <button 
+                    onClick={handleAddContact}
+                    disabled={!newContactName || !newContactAddress}
+                    className="w-full py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 font-bold rounded-lg text-sm transition-colors"
+                  >
+                    Save Contact
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
