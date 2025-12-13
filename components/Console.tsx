@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Trash2, ChevronRight, Command } from 'lucide-react';
+import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown } from 'lucide-react';
 import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from '../types';
 
 interface ConsoleProps {
@@ -8,8 +8,63 @@ interface ConsoleProps {
 
 interface ConsoleLine {
   type: 'input' | 'output' | 'error' | 'system';
-  content: string;
+  content: string | object;
 }
+
+// Recursive JSON Renderer Component
+const JsonRenderer: React.FC<{ value: any; root?: boolean }> = ({ value, root = false }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  if (value === null) return <span className="text-rose-400 font-mono">null</span>;
+  if (value === undefined) return <span className="text-slate-500 font-mono">undefined</span>;
+  
+  if (typeof value === 'boolean') return <span className="text-purple-400 font-bold font-mono">{value.toString()}</span>;
+  if (typeof value === 'number') return <span className="text-amber-400 font-mono">{value}</span>;
+  if (typeof value === 'string') return <span className="text-emerald-300 font-mono break-all">"{value}"</span>;
+
+  const isArray = Array.isArray(value);
+  const isEmpty = Object.keys(value).length === 0;
+
+  if (isEmpty) {
+    return <span className="text-slate-500 font-mono">{isArray ? '[]' : '{}'}</span>;
+  }
+
+  const Brackets = ({ open }: { open: boolean }) => (
+    <span className="text-slate-400 font-bold font-mono">{open ? (isArray ? '[' : '{') : (isArray ? ']' : '}')}</span>
+  );
+
+  return (
+    <div className={`inline-block align-top ${root ? 'w-full' : ''}`}>
+      <div 
+        onClick={(e) => { e.stopPropagation(); setIsCollapsed(!isCollapsed); }} 
+        className="cursor-pointer hover:bg-slate-800/50 rounded px-1 -ml-1 inline-flex items-center select-none group transition-colors"
+      >
+        <span className={`mr-1 text-slate-600 group-hover:text-slate-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}>
+          <ChevronDown size={12} />
+        </span>
+        <Brackets open={true} />
+        {isCollapsed && <span className="text-slate-600 text-xs mx-1 font-mono">...</span>}
+        {isCollapsed && <Brackets open={false} />}
+        {isCollapsed && <span className="ml-2 text-xs text-slate-600 font-mono">{Object.keys(value).length} items</span>}
+      </div>
+
+      {!isCollapsed && (
+        <div className="pl-4 border-l border-slate-800 ml-[0.35rem] my-1">
+          {Object.entries(value).map(([key, val], index, arr) => (
+            <div key={key} className="my-0.5 flex items-start">
+              {!isArray && <span className="text-blue-300 mr-2 font-mono whitespace-nowrap opacity-90">"{key}":</span>}
+              <div className="flex-1 min-w-0">
+                <JsonRenderer value={val} />
+                {index < arr.length - 1 && <span className="text-slate-500 font-mono">,</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {!isCollapsed && <Brackets open={false} />}
+    </div>
+  );
+};
 
 const Console: React.FC<ConsoleProps> = ({ network }) => {
   const [history, setHistory] = useState<ConsoleLine[]>([
@@ -64,7 +119,7 @@ const Console: React.FC<ConsoleProps> = ({ network }) => {
     const args = cmd.trim().split(' ');
     const command = args[0].toLowerCase();
     
-    let output = '';
+    let output: string | object = '';
     let type: ConsoleLine['type'] = 'output';
 
     switch (command) {
@@ -92,13 +147,13 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         }
         break;
       case 'listunspent':
-        output = JSON.stringify([
+        output = [
           { txid: "d4f3...", vout: 0, address: currentAddress, amount: 0.50000000, confirmations: 120 },
           { txid: "a1b2...", vout: 1, address: currentAddress, amount: 0.74503211, confirmations: 6 }
-        ], null, 2);
+        ];
         break;
       case 'getwalletinfo':
-        output = JSON.stringify({
+        output = {
           walletname: network === 'TESTNET' ? "ZenithTest" : "ZenithMain",
           walletversion: 169900,
           balance: 1.24503211,
@@ -107,7 +162,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
           txcount: 42,
           keypoololdest: 1698000000,
           keypoolsize: 1000
-        }, null, 2);
+        };
         break;
       case 'dumpwallet':
         output = args[1] 
@@ -119,7 +174,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         output = 'wallet encrypted; The keypool has been flushed and a new one generated. The wallet is now locked.';
         break;
       case 'getblockchaininfo':
-        output = JSON.stringify({
+        output = {
           chain: network === 'TESTNET' ? "test" : "main",
           blocks: 834120,
           headers: 834120,
@@ -127,7 +182,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
           difficulty: 72000000000000,
           mediantime: 1709200000,
           verificationprogress: 0.99999
-        }, null, 2);
+        };
         break;
       case 'getblockcount':
         output = '834120';
@@ -136,7 +191,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         output = '0000000000000000000182746c8f92j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9';
         break;
       case 'getblock':
-        output = JSON.stringify({
+        output = {
           hash: args[1] || "0000... (example)",
           confirmations: 1,
           size: 1523,
@@ -146,7 +201,7 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
           merkleroot: "a1b2...",
           tx: ["tx1...", "tx2..."],
           time: 1709200000
-        }, null, 2);
+        };
         break;
       case 'getblockhash':
         output = '0000000000000000000182746c8f92j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9';
@@ -155,10 +210,10 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         output = '0200000001' + Math.random().toString(16).substring(2);
         break;
       case 'decoderawtransaction':
-        output = JSON.stringify({ txid: "...", version: 2, locktime: 0, vin: [], vout: [] }, null, 2);
+        output = { txid: "...", version: 2, locktime: 0, vin: [], vout: [] };
         break;
       case 'signrawtransactionwithwallet':
-        output = JSON.stringify({ hex: "0200...", complete: true }, null, 2);
+        output = { hex: "0200...", complete: true };
         break;
       case 'sendrawtransaction':
          output = Math.random().toString(16).substring(2) + Math.random().toString(16).substring(2);
@@ -167,16 +222,16 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         output = '0200000001' + Math.random().toString(16).substring(2) + '...';
         break;
       case 'estimatesmartfee':
-        output = JSON.stringify({ feerate: 0.00001000, blocks: args[1] || 6 }, null, 2);
+        output = { feerate: 0.00001000, blocks: args[1] || 6 };
         break;
       case 'validateaddress':
-        output = JSON.stringify({
+        output = {
           isvalid: true,
           address: args[1] || currentAddress,
           scriptPubKey: "5120...",
           isscript: false,
           iswitness: true
-        }, null, 2);
+        };
         break;
       default:
         output = `Command not found: ${command}. Type "help" for a list of commands.`;
@@ -257,13 +312,32 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
         <div className="flex-1 overflow-y-auto p-4 space-y-2 cursor-text" onClick={() => inputRef.current?.focus()}>
             {history.map((line, idx) => (
             <div key={idx} className={`${
-                line.type === 'input' ? 'text-slate-100 font-bold mt-4' : 
-                line.type === 'error' ? 'text-rose-500' : 
-                line.type === 'system' ? 'text-slate-400 italic' :
-                'text-emerald-500 whitespace-pre-wrap break-words'
+                line.type === 'input' ? 'mt-4' : ''
             }`}>
-                {line.type === 'input' && <span className="text-amber-500 mr-2">$</span>}
-                {line.content}
+                {line.type === 'input' && (
+                  <div className="text-slate-100 font-bold flex items-center">
+                    <span className="text-amber-500 mr-2">$</span>
+                    <span>{line.content as string}</span>
+                  </div>
+                )}
+                
+                {line.type === 'error' && (
+                  <div className="text-rose-500 whitespace-pre-wrap">{line.content as string}</div>
+                )}
+                
+                {line.type === 'system' && (
+                   <div className="text-slate-400 italic mb-2">{line.content as string}</div>
+                )}
+
+                {line.type === 'output' && (
+                  <div className="text-slate-300">
+                    {typeof line.content === 'object' ? (
+                      <JsonRenderer value={line.content} root={true} />
+                    ) : (
+                      <div className="whitespace-pre-wrap text-emerald-500">{line.content as string}</div>
+                    )}
+                  </div>
+                )}
             </div>
             ))}
             <div ref={bottomRef} />
