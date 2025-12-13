@@ -68,6 +68,7 @@ const App: React.FC = () => {
   }, []);
 
   const currentAddress = addresses[network];
+  const hasWallet = Boolean(addresses.TESTNET || addresses.MAINNET);
 
   // Define sync logic as a reusable function
   const refreshWalletData = useCallback(async () => {
@@ -89,6 +90,11 @@ const App: React.FC = () => {
       
     } catch (e) {
       console.error("Failed to sync with node:", e);
+      // If sync fails (e.g. no wallet), ensure state is consistent with empty wallet if intended
+      if (!currentAddress) {
+          setFetchedBalance(0);
+          setWalletState(INITIAL_WALLET_STATE);
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -110,6 +116,17 @@ const App: React.FC = () => {
     
     // Reset to dashboard to show new data
     setCurrentView(AppView.DASHBOARD);
+  };
+
+  const handleLogout = () => {
+    setAddresses({
+        TESTNET: '',
+        MAINNET: ''
+    });
+    setWalletState(INITIAL_WALLET_STATE);
+    setFetchedBalance(0);
+    setCurrentView(AppView.DASHBOARD);
+    setIsMobileMenuOpen(false);
   };
 
   const handleClearTransactions = () => {
@@ -177,7 +194,7 @@ const App: React.FC = () => {
           <NavItem view={AppView.ADVISOR} icon={Bot} label="AI Advisor" />
           <NavItem view={AppView.CLI} icon={Terminal} label="Bitcoin CLI" />
           
-          <div className="pt-4 mt-4 border-t border-slate-800">
+          <div className="pt-4 mt-4 border-t border-slate-800 space-y-2">
             <button 
               onClick={() => { setShowImportModal(true); setIsMobileMenuOpen(false); }}
               className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-all duration-200"
@@ -185,6 +202,16 @@ const App: React.FC = () => {
               <KeyRound size={20} />
               <span>Import Wallet</span>
             </button>
+            
+            {hasWallet && (
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-all duration-200"
+              >
+                <LogOut size={20} />
+                <span>Logout</span>
+              </button>
+            )}
           </div>
         </nav>
 
@@ -217,13 +244,25 @@ const App: React.FC = () => {
           <NavItem view={AppView.RECEIVE} icon={Download} label="Receive" />
           <NavItem view={AppView.ADVISOR} icon={Bot} label="AI Advisor" />
           <NavItem view={AppView.CLI} icon={Terminal} label="Bitcoin CLI" />
-          <button 
-              onClick={() => { setShowImportModal(true); setIsMobileMenuOpen(false); }}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-all duration-200 mt-4 border-t border-slate-800 pt-4"
-            >
-              <KeyRound size={20} />
-              <span>Import Wallet</span>
-          </button>
+          
+          <div className="pt-4 mt-4 border-t border-slate-800 space-y-2">
+             <button 
+                onClick={() => { setShowImportModal(true); setIsMobileMenuOpen(false); }}
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-all duration-200"
+              >
+                <KeyRound size={20} />
+                <span>Import Wallet</span>
+            </button>
+            {hasWallet && (
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-all duration-200"
+              >
+                <LogOut size={20} />
+                <span>Logout</span>
+              </button>
+            )}
+          </div>
         </nav>
       </div>
 
