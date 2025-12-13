@@ -2,23 +2,29 @@ import React, { useState } from 'react';
 import { ShieldCheck, AlertTriangle, Send as SendIcon, CheckCircle2 } from 'lucide-react';
 import { analyzeTransactionRisk } from '../services/geminiService';
 import { TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from '../types';
+import { executeBitcoinCli } from '../services/bitcoinCli';
 
 interface SendFormProps {
   network: Network;
+  currentAddress: string;
 }
 
-const SendForm: React.FC<SendFormProps> = ({ network }) => {
+const SendForm: React.FC<SendFormProps> = ({ network, currentAddress }) => {
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [riskReport, setRiskReport] = useState<string | null>(null);
   const [step, setStep] = useState<'input' | 'confirm' | 'success'>('input');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
 
-  const currentPlaceholder = network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS;
+  // Use the active address if available, otherwise fallback (for placeholder text)
+  const currentPlaceholder = currentAddress || (network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS);
 
   const handleAnalyze = async () => {
     if (!address) return;
+    setError('');
     setAnalyzing(true);
     const report = await analyzeTransactionRisk(address, Number(amount));
     setRiskReport(report);
@@ -30,10 +36,18 @@ const SendForm: React.FC<SendFormProps> = ({ network }) => {
     setShowConfirmDialog(true);
   };
 
-  const handleFinalBroadcast = () => {
-    setShowConfirmDialog(false);
-    // Simulate transaction delay
-    setStep('success');
+  const handleFinalBroadcast = async () => {
+    setIsBroadcasting(true);
+    try {
+        await executeBitcoinCli('sendtoaddress', [address, amount], network, { address: currentAddress });
+        setShowConfirmDialog(false);
+        setStep('success');
+    } catch (e: any) {
+        setError(e.message || "Failed to broadcast transaction");
+        setShowConfirmDialog(false);
+    } finally {
+        setIsBroadcasting(false);
+    }
   };
 
   const reset = () => {
@@ -42,6 +56,7 @@ const SendForm: React.FC<SendFormProps> = ({ network }) => {
     setRiskReport(null);
     setStep('input');
     setShowConfirmDialog(false);
+    setError('');
   };
 
   if (step === 'success') {
@@ -69,6 +84,13 @@ const SendForm: React.FC<SendFormProps> = ({ network }) => {
       <div className="bg-slate-800/50 border border-slate-700 p-8 rounded-2xl shadow-xl">
         <h2 className="text-2xl font-bold text-white mb-6">Send Bitcoin <span className="text-sm font-normal text-slate-400 ml-2">({network})</span></h2>
         
+        {error && (
+            <div className="bg-rose-500/20 border border-rose-500/30 text-rose-200 px-4 py-3 rounded-xl text-sm mb-4 flex items-center">
+                <AlertTriangle className="mr-2 shrink-0" size={16} />
+                {error}
+            </div>
+        )}
+
         {step === 'input' && (
           <div className="space-y-6">
             <div>
@@ -94,12 +116,11 @@ const SendForm: React.FC<SendFormProps> = ({ network }) => {
                 />
                 <span className="absolute right-4 top-3.5 text-slate-500 font-medium">{network === 'TESTNET' ? 'tBTC' : 'BTC'}</span>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Available: 1.2450 {network === 'TESTNET' ? 'tBTC' : 'BTC'}</p>
             </div>
 
             <button 
               onClick={handleAnalyze}
-              disabled={!address || !amount || analyzing}
+              disabled={!address || !amount || analyzing || !currentAddress}
               className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 font-bold py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
             >
               {analyzing ? (
@@ -108,7 +129,7 @@ const SendForm: React.FC<SendFormProps> = ({ network }) => {
                   <span>Scanning Address...</span>
                 </>
               ) : (
-                <span>Review Transaction</span>
+                <span>{currentAddress ? 'Review Transaction' : 'Wallet Not Configured'}</span>
               )}
             </button>
           </div>
@@ -203,15 +224,19 @@ const SendForm: React.FC<SendFormProps> = ({ network }) => {
              <div className="flex space-x-3">
                <button 
                  onClick={() => setShowConfirmDialog(false)}
-                 className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition-colors"
+                 disabled={isBroadcasting}
+                 className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition-colors disabled:opacity-50"
                >
                  Cancel
                </button>
                <button 
                  onClick={handleFinalBroadcast}
-                 className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20"
+                 disabled={isBroadcasting}
+                 className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 disabled:opacity-50 flex justify-center"
                >
-                 Broadcast Now
+                 {isBroadcasting ? (
+                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                 ) : "Broadcast Now"}
                </button>
              </div>
           </div>

@@ -276,8 +276,8 @@ const App: React.FC = () => {
                 isRefreshing={isSyncing}
               />
             )}
-            {currentView === AppView.SEND && <SendForm network={network} />}
-            {currentView === AppView.AIRDROP && <Airdrop network={network} />}
+            {currentView === AppView.SEND && <SendForm network={network} currentAddress={currentAddress} />}
+            {currentView === AppView.AIRDROP && <Airdrop network={network} currentAddress={currentAddress} />}
             {currentView === AppView.ADVISOR && <GeminiAdvisor />}
             {currentView === AppView.CLI && <Console network={network} />}
             {currentView === AppView.RECEIVE && (
@@ -289,7 +289,7 @@ const App: React.FC = () => {
                 
                 <div className="bg-white p-6 rounded-2xl shadow-2xl shadow-white/5">
                   <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${currentAddress}`} 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${currentAddress || 'not-configured'}`} 
                     alt="Wallet QR Code" 
                     className="w-64 h-64 mix-blend-multiply"
                   />
@@ -297,7 +297,7 @@ const App: React.FC = () => {
 
                 <div className="w-full max-w-2xl bg-slate-800 p-4 rounded-xl flex items-center justify-between border border-slate-700">
                   <code className="text-amber-500 font-mono text-sm truncate mr-4">
-                    {currentAddress}
+                    {currentAddress || 'Generating... (Please Create/Import Wallet)'}
                   </code>
                   <button className="text-slate-400 hover:text-white transition-colors" title="Copy">
                     <Download size={20} className="transform rotate-180" />

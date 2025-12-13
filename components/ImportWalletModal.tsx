@@ -31,7 +31,8 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({ isOpen, onClose, 
   if (!isOpen) return null;
 
   const validateSeed = (phrase: string): boolean => {
-    const words = phrase.trim().split(/\s+/);
+    // Filter out empty strings from multiple spaces
+    const words = phrase.trim().split(/\s+/).filter(w => w.length > 0);
     return words.length === 12 || words.length === 24;
   };
 
@@ -79,6 +80,7 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({ isOpen, onClose, 
   };
 
   const isValid = validateSeed(seed);
+  const wordCount = seed.trim().split(/\s+/).filter(w => w.length > 0).length;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -149,7 +151,7 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({ isOpen, onClose, 
                     <div className="absolute bottom-3 right-3 bg-slate-900/80 backdrop-blur px-2 py-1 rounded-md border border-slate-700">
                         <span className="text-emerald-500 text-xs flex items-center font-medium">
                             <CheckCircle2 size={12} className="mr-1" />
-                            Valid ({seed.trim().split(/\s+/).length} words)
+                            Valid ({wordCount} words)
                         </span>
                     </div>
                 )}
