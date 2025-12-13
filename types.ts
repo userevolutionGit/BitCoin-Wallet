@@ -47,10 +47,18 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface Contact {
+  id: string;
+  name: string;
+  address: string;
+  network: Network;
+}
+
 export enum AppView {
   DASHBOARD = 'DASHBOARD',
   SEND = 'SEND',
   RECEIVE = 'RECEIVE',
   ADVISOR = 'ADVISOR',
-  CLI = 'CLI'
+  CLI = 'CLI',
+  AIRDROP = 'AIRDROP'
 }

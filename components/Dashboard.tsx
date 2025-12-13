@@ -300,11 +300,21 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
                                 <div className="md:col-span-3 space-y-2">
                                     <p className="text-xs text-slate-400 mb-2 font-medium">From (Inputs)</p>
                                     {tx.inputs?.map((input, idx) => (
-                                        <div key={idx} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700/50">
-                                            <span className="font-mono text-xs text-slate-300 truncate w-32" title={input.address}>{formatAddress(input.address)}</span>
-                                            <span className="text-xs text-slate-200">{input.amount.toFixed(8)}</span>
+                                        <div key={idx} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700/50 group">
+                                            <div className="flex items-center space-x-2 min-w-0">
+                                                <span className="font-mono text-xs text-slate-300 truncate" title={input.address}>{formatAddress(input.address)}</span>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(input.address); }}
+                                                    className="text-slate-600 hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Copy Address"
+                                                >
+                                                    <Copy size={10} />
+                                                </button>
+                                            </div>
+                                            <span className="text-xs text-slate-200 font-mono ml-2">{input.amount.toFixed(8)}</span>
                                         </div>
                                     ))}
+                                    {(!tx.inputs || tx.inputs.length === 0) && <p className="text-xs text-slate-600 italic">No inputs recorded</p>}
                                 </div>
                                 
                                 {/* Arrow */}
@@ -318,11 +328,21 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
                                 <div className="md:col-span-3 space-y-2">
                                     <p className="text-xs text-slate-400 mb-2 font-medium">To (Outputs)</p>
                                     {tx.outputs?.map((output, idx) => (
-                                        <div key={idx} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700/50">
-                                            <span className="font-mono text-xs text-slate-300 truncate w-32" title={output.address}>{formatAddress(output.address)}</span>
-                                            <span className="text-xs text-slate-200">{output.amount.toFixed(8)}</span>
+                                        <div key={idx} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700/50 group">
+                                            <div className="flex items-center space-x-2 min-w-0">
+                                                <span className="font-mono text-xs text-slate-300 truncate" title={output.address}>{formatAddress(output.address)}</span>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(output.address); }}
+                                                    className="text-slate-600 hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Copy Address"
+                                                >
+                                                    <Copy size={10} />
+                                                </button>
+                                            </div>
+                                            <span className="text-xs text-slate-200 font-mono ml-2">{output.amount.toFixed(8)}</span>
                                         </div>
                                     ))}
+                                     {(!tx.outputs || tx.outputs.length === 0) && <p className="text-xs text-slate-600 italic">No outputs recorded</p>}
                                 </div>
                             </div>
                         </div>

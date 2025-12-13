@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Send, Download, Bot, LogOut, Bitcoin, Menu, X, Terminal, CheckCircle2, KeyRound } from 'lucide-react';
+import { LayoutDashboard, Send, Download, Bot, LogOut, Bitcoin, Menu, X, Terminal, CheckCircle2, KeyRound, Users } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import SendForm from './components/SendForm';
 import GeminiAdvisor from './components/GeminiAdvisor';
 import Console from './components/Console';
 import ImportWalletModal from './components/ImportWalletModal';
+import Airdrop from './components/Airdrop';
 import { AppView, WalletState, TransactionType, TransactionStatus, TESTNET_ADDRESS, MAINNET_ADDRESS, Network } from './types';
 import { executeBitcoinCli } from './services/bitcoinCli';
 
@@ -166,6 +167,7 @@ const App: React.FC = () => {
         <nav className="flex-1 px-4 py-6 space-y-2">
           <NavItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
           <NavItem view={AppView.SEND} icon={Send} label="Send" />
+          <NavItem view={AppView.AIRDROP} icon={Users} label="Airdrop Friends" />
           <NavItem view={AppView.RECEIVE} icon={Download} label="Receive" />
           <NavItem view={AppView.ADVISOR} icon={Bot} label="AI Advisor" />
           <NavItem view={AppView.CLI} icon={Terminal} label="Bitcoin CLI" />
@@ -206,6 +208,7 @@ const App: React.FC = () => {
         <nav className="flex-1 p-4 space-y-2">
           <NavItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
           <NavItem view={AppView.SEND} icon={Send} label="Send" />
+          <NavItem view={AppView.AIRDROP} icon={Users} label="Airdrop Friends" />
           <NavItem view={AppView.RECEIVE} icon={Download} label="Receive" />
           <NavItem view={AppView.ADVISOR} icon={Bot} label="AI Advisor" />
           <NavItem view={AppView.CLI} icon={Terminal} label="Bitcoin CLI" />
@@ -232,6 +235,7 @@ const App: React.FC = () => {
             <h2 className="text-lg font-semibold text-white capitalize">
               {currentView === AppView.ADVISOR ? 'Zenith AI Advisor' : 
                currentView === AppView.CLI ? 'Bitcoin Core Console' : 
+               currentView === AppView.AIRDROP ? 'Airdrop & Friends' :
                currentView.toLowerCase()}
             </h2>
           </div>
@@ -273,6 +277,7 @@ const App: React.FC = () => {
               />
             )}
             {currentView === AppView.SEND && <SendForm network={network} />}
+            {currentView === AppView.AIRDROP && <Airdrop network={network} />}
             {currentView === AppView.ADVISOR && <GeminiAdvisor />}
             {currentView === AppView.CLI && <Console network={network} />}
             {currentView === AppView.RECEIVE && (
