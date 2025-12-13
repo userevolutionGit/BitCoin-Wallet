@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowUpRight, ArrowDownLeft, Copy, Send, QrCode, Check, Filter, X, ChevronDown, ChevronUp, Hash, Activity, Clock, ExternalLink, Trash2, ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Copy, Send, QrCode, Check, Filter, X, ChevronDown, ChevronUp, Hash, Activity, Clock, ExternalLink, Trash2, ArrowRight, RefreshCw, Search } from 'lucide-react';
 import { WalletState, TransactionType, TransactionStatus, Network, TESTNET_ADDRESS, MAINNET_ADDRESS, AppView } from '../types';
 
 interface DashboardProps {
@@ -17,6 +17,7 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | TransactionStatus>('ALL');
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const currentAddress = network === 'TESTNET' ? TESTNET_ADDRESS : MAINNET_ADDRESS;
 
@@ -38,7 +39,17 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
   const filteredTransactions = walletState.transactions.filter(tx => {
     const matchesType = typeFilter === 'ALL' || tx.type === typeFilter;
     const matchesStatus = statusFilter === 'ALL' || tx.status === statusFilter;
-    return matchesType && matchesStatus;
+    
+    const fullTxId = `8a9f3d7c5b6e2f1a9d4c8b3e5a7d9c1f2e4b6a8d0c2e4f6a8b1d3c5e7f9a2b1c${tx.id}`;
+    const query = searchQuery.toLowerCase();
+    
+    const matchesSearch = !query || 
+      fullTxId.includes(query) ||
+      tx.address.toLowerCase().includes(query) ||
+      tx.inputs?.some(i => i.address.toLowerCase().includes(query)) ||
+      tx.outputs?.some(o => o.address.toLowerCase().includes(query));
+
+    return matchesType && matchesStatus && matchesSearch;
   });
 
   const FilterPill = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
@@ -107,12 +118,12 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
         </div>
       </div>
 
-      {/* Recent Transactions Header & Filters */}
+      {/* Recent Transactions Header & Search */}
       <div className="space-y-4">
-        <div className="flex justify-between items-center px-2">
-           <div className="flex items-center space-x-4">
-             <h3 className="text-xl font-semibold text-white">Recent Transactions</h3>
-             
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 px-2">
+           <h3 className="text-xl font-semibold text-white">Recent Transactions</h3>
+           
+           <div className="flex items-center space-x-2 w-full md:w-auto">
              {/* Action Buttons Group */}
              <div className="flex items-center space-x-1 bg-slate-800/50 p-1 rounded-lg">
                 <button 
@@ -147,22 +158,44 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
                 )}
              </div>
            </div>
-           
-           {(typeFilter !== 'ALL' || statusFilter !== 'ALL') && (
-             <button 
-               onClick={() => { setTypeFilter('ALL'); setStatusFilter('ALL'); }}
-               className="text-xs text-slate-500 hover:text-white flex items-center space-x-1"
-             >
-               <X size={12} />
-               <span>Clear Filters</span>
-             </button>
-           )}
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="text-slate-500 group-focus-within:text-amber-500 transition-colors" size={18} />
+          </div>
+          <input 
+            type="text" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by Transaction Hash or Address..."
+            className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl py-3 pl-10 pr-10 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all outline-none"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-white"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {/* Expandable Filter Panel */}
         {showFilters && (
           <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-            <div className="space-y-2">
+             <div className="flex justify-between items-center mb-2">
+               <h4 className="text-sm font-semibold text-slate-300">Advanced Filters</h4>
+               <button 
+                 onClick={() => { setTypeFilter('ALL'); setStatusFilter('ALL'); setSearchQuery(''); }}
+                 className="text-xs text-slate-500 hover:text-white flex items-center space-x-1"
+               >
+                 <span>Reset All</span>
+               </button>
+             </div>
+             
+             <div className="space-y-2">
               <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Type</span>
               <div className="flex flex-wrap gap-2">
                 <FilterPill label="All" active={typeFilter === 'ALL'} onClick={() => setTypeFilter('ALL')} />
@@ -361,15 +394,17 @@ const Dashboard: React.FC<DashboardProps> = ({ walletState, network, onNavigate,
                     <Activity className="text-slate-500" size={24} />
                 </div>
                 <h3 className="text-slate-300 font-medium mb-1">No Transactions Found</h3>
-                <p className="text-slate-500 text-sm mb-4">Your history is currently empty or filtered out.</p>
+                <p className="text-slate-500 text-sm mb-4">
+                    {searchQuery ? `No results for "${searchQuery}"` : "Your history is currently empty or filtered out."}
+                </p>
                 
                 <div className="flex justify-center space-x-4">
-                    {(typeFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                    {(typeFilter !== 'ALL' || statusFilter !== 'ALL' || searchQuery) && (
                         <button 
-                        onClick={() => { setTypeFilter('ALL'); setStatusFilter('ALL'); }}
+                        onClick={() => { setTypeFilter('ALL'); setStatusFilter('ALL'); setSearchQuery(''); }}
                         className="text-amber-500 hover:text-amber-400 text-sm font-medium"
                         >
-                        Clear Filters
+                        Clear Filters & Search
                         </button>
                     )}
                     <button 
