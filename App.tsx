@@ -16,22 +16,6 @@ const INITIAL_WALLET_STATE: WalletState = {
   addressBalances: []
 };
 
-// Simple pseudo-random hash for simulation purposes
-const simulateAddressFromSeed = (seed: string, network: Network) => {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  const hex = Math.abs(hash).toString(16).padStart(8, '0');
-  const suffix = hex + hex.split('').reverse().join(''); // Make it longer
-  
-  if (network === 'TESTNET') {
-    return `tb1q${suffix}test${hex}x9y8z`;
-  }
-  return `bc1q${suffix}main${hex}k2m4n`;
-};
-
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [walletState, setWalletState] = useState<WalletState>(INITIAL_WALLET_STATE);
@@ -105,17 +89,64 @@ const App: React.FC = () => {
     refreshWalletData();
   }, [refreshWalletData]);
 
-  const handleImportWallet = (seed: string) => {
-    const newTestnet = simulateAddressFromSeed(seed, 'TESTNET');
-    const newMainnet = simulateAddressFromSeed(seed, 'MAINNET');
-    
-    setAddresses({
-      TESTNET: newTestnet,
-      MAINNET: newMainnet
-    });
-    
-    // Reset to dashboard to show new data
-    setCurrentView(AppView.DASHBOARD);
+  const handleImportWallet = async (input: string) => {
+    setIsSyncing(true);
+    try {
+        let descriptor = input.trim();
+        
+        // Detect input type
+        const isDescriptor = descriptor.startsWith('wpkh(') || descriptor.startsWith('tr(') || descriptor.startsWith('pkh(') || descriptor.startsWith('sh(');
+        
+        if (!isDescriptor) {
+            // Simulate BIP39 Tool conversion from Mnemonic/Seed to Descriptor
+            // We mock the xprv generation for the simulation
+            // In a real app, this would use bip39 and bip32 libraries
+            
+            // Generate a deterministic mock xprv based on the input string to ensure consistency
+            const seedHash = btoa(input).substring(0, 30).replace(/[^a-zA-Z0-9]/g, '');
+            const xprvPrefix = network === 'TESTNET' ? 'tprv' : 'xprv';
+            const mockXprv = `${xprvPrefix}8ZgxMBicQKsPd${seedHash}X1Y2Z3`;
+            
+            // Standard BIP84 Path for Native Segwit
+            const path = network === 'TESTNET' ? "84'/1'/0'" : "84'/0'/0'";
+            const fingerprint = "d34db33f"; // Mock fingerprint
+            
+            // Construct the full descriptor with xprv and path as requested
+            descriptor = `wpkh([${fingerprint}/${path}]${mockXprv}/0/*)#checksum`;
+            
+            console.log("Converted Seed to Descriptor:", descriptor);
+        }
+
+        // Prepare the JSON payload for importdescriptors
+        // It requires an array of descriptor objects
+        const requestPayload = [{
+            desc: descriptor,
+            active: true,
+            timestamp: "now",
+            range: [0, 1000],
+            label: "imported-wallet"
+        }];
+
+        // Execute importdescriptors command
+        const importedAddress = await executeBitcoinCli(
+            'importdescriptors', 
+            [JSON.stringify(requestPayload)], 
+            network, 
+            { address: '' }
+        );
+
+        if (importedAddress) {
+            setAddresses(prev => ({
+                ...prev,
+                [network]: importedAddress
+            }));
+            setCurrentView(AppView.DASHBOARD);
+        }
+    } catch (e) {
+        console.error("Import failed:", e);
+    } finally {
+        setIsSyncing(false);
+    }
   };
 
   const handleLogout = () => {

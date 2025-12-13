@@ -2,7 +2,7 @@
 export const DEFAULT_ADDRESS = '';
 export const TESTNET_ADDRESS = 'tb1ppksphu4jfv0watdurwzzlp9vstryak0mwz05xsqrza4xxp7e3hfs2w6cqj';
 export const MAINNET_ADDRESS = '';
-export const EXAMPLE_ADDRESS = 'tb1p90a7f3d12d4eaf03f2bcbff3b021ac6427c01d42435b3be5f43686c24e';
+export const EXAMPLE_ADDRESS = 'tb1ppksphu4jfv0watdurwzzlp9vstryak0mwz05xsqrza4xxp7e3hfs2w6cqj';
 
 export type Network = 'MAINNET' | 'TESTNET';
 

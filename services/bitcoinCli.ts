@@ -130,7 +130,7 @@ export const executeBitcoinCli = async (
   await new Promise(resolve => setTimeout(resolve, 300));
 
   const currentAddress = context?.address || '';
-  // Don't execute wallet commands without an address
+  // Don't execute wallet commands without an address (except importdescriptors and others that create/load wallets)
   if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo', 'listaddressgroupings'].includes(command.toLowerCase())) {
      throw new Error("No wallet loaded. Please import or create a wallet.");
   }
@@ -138,6 +138,44 @@ export const executeBitcoinCli = async (
   const history = currentAddress ? getHistory(network, currentAddress) : [];
 
   switch (command.toLowerCase()) {
+    case 'importdescriptors':
+        // usage: importdescriptors '[{"desc": "...", "active": true, ...}]'
+        let requests;
+        try {
+            requests = JSON.parse(args[0]);
+        } catch (e) {
+            throw new Error("Invalid JSON format for importdescriptors requests. Expected '[{ ... }]'");
+        }
+
+        if (!Array.isArray(requests) || requests.length === 0 || !requests[0].desc) {
+            throw new Error("Missing descriptor in request");
+        }
+
+        // Hardcoded return for TESTNET as requested
+        if (network === 'TESTNET') {
+            return 'tb1ppksphu4jfv0watdurwzzlp9vstryak0mwz05xsqrza4xxp7e3hfs2w6cqj';
+        }
+
+        const descriptor = requests[0].desc;
+        
+        // In a real implementation, Bitcoin Core would derive addresses from the descriptor range.
+        // For this mock, we generate a deterministic address based on the descriptor string.
+        let hash = 0;
+        for (let i = 0; i < descriptor.length; i++) {
+            hash = ((hash << 5) - hash) + descriptor.charCodeAt(i);
+            hash |= 0;
+        }
+        const hex = Math.abs(hash).toString(16).padStart(8, '0');
+        
+        // Since we already returned if network === 'TESTNET', we know we are on MAINNET here.
+        const suffix = hex + 'main';
+        
+        const prefix = 'bc1q';
+        // Simulate a derived address from this descriptor
+        const derivedAddr = `${prefix}${suffix}desc${hex.substring(0,4)}`;
+        
+        return derivedAddr;
+
     case 'getbalance':
        return calculateBalance(history);
     
