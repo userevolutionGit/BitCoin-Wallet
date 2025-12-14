@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown } from 'lucide-react';
+import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown, Server, Power } from 'lucide-react';
 import { EXAMPLE_ADDRESS, Network } from '../types';
-import { executeBitcoinCli } from '../services/bitcoinCli';
+import { executeBitcoinCli, getNodeStatus } from '../services/bitcoinCli';
 
 interface ConsoleProps {
   network: Network;
@@ -9,7 +9,7 @@ interface ConsoleProps {
 }
 
 interface ConsoleLine {
-  type: 'input' | 'output' | 'error' | 'system';
+  type: 'input' | 'output' | 'error' | 'system' | 'log';
   content: string | object;
 }
 
@@ -74,13 +74,27 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
     { type: 'system', content: 'Type "help" for an overview of available commands.' }
   ]);
   const [input, setInput] = useState('');
+  const [serverStatus, setServerStatus] = useState(getNodeStatus());
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const placeholderAddress = currentAddress || EXAMPLE_ADDRESS;
   const promptHost = network === 'TESTNET' ? 'zenith-testnet' : 'zenith-mainnet';
 
+  // Poll for server status (e.g. up/down/uptime)
+  useEffect(() => {
+      const interval = setInterval(() => {
+          setServerStatus(getNodeStatus());
+      }, 1000);
+      return () => clearInterval(interval);
+  }, []);
+
   const COMMAND_GROUPS = {
+    Server: [
+        { cmd: 'bitcoind', args: false },
+        { cmd: 'stop', args: false },
+        { cmd: 'getconnectioncount', args: false },
+    ],
     Wallet: [
       { cmd: 'getbalance', args: false },
       { cmd: 'getnewaddress', args: false },
@@ -119,6 +133,31 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
     setHistory(prev => [...prev, { type: 'system', content: `Switched to ${network} mode.` }]);
   }, [network]);
 
+  const simulateStartupLogs = async () => {
+      const logs = [
+          "2024-05-15T10:00:01Z Bitcoin Core version v26.0.0 (release build)",
+          "2024-05-15T10:00:01Z InitParameterInteraction: parameter interaction: -whitelistforcerelay=1 -> -whitelistrelay=1",
+          "2024-05-15T10:00:02Z Validating signatures for all blocks so far...",
+          "2024-05-15T10:00:02Z Scheduler thread start",
+          "2024-05-15T10:00:03Z Loading block index...",
+          "2024-05-15T10:00:04Z Block index loaded. Rewinding blocks...",
+          "2024-05-15T10:00:05Z Verifying blocks...",
+          "2024-05-15T10:00:06Z Block verification complete.",
+          "2024-05-15T10:00:07Z init message: Loading wallet...",
+          "2024-05-15T10:00:08Z Registering wallet signals...",
+          "2024-05-15T10:00:09Z Net thread start",
+          "2024-05-15T10:00:10Z dnsseed thread start",
+          "2024-05-15T10:00:11Z Done loading"
+      ];
+
+      for (const log of logs) {
+          await new Promise(r => setTimeout(r, 400));
+          setHistory(prev => [...prev, { type: 'log', content: log }]);
+      }
+      setHistory(prev => [...prev, { type: 'system', content: "Zenith Bitcoin Core server started successfully." }]);
+      setServerStatus(getNodeStatus());
+  };
+
   const handleCommand = async (cmd: string) => {
     const args = cmd.trim().split(' ');
     const command = args[0].toLowerCase();
@@ -136,7 +175,12 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
       // Execute command via the simulate service
       const serviceResult = await executeBitcoinCli(command, args.slice(1), network, { address: currentAddress });
       
-      // If serviceResult is null (undefined in switch), the service throws an error in default case now, so this check is redundant but safe
+      // Special Handling for "bitcoind" command visualization
+      if (serviceResult === "STARTING_SEQUENCE") {
+          await simulateStartupLogs();
+          return;
+      }
+      
       if (serviceResult !== undefined && serviceResult !== null) {
         setHistory(prev => [...prev, { type: 'output', content: serviceResult }]);
       }
@@ -162,100 +206,156 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
     }
   };
 
+  const formatUptime = (sec: number) => {
+      if (sec < 60) return `${sec}s`;
+      if (sec < 3600) return `${Math.floor(sec/60)}m`;
+      return `${Math.floor(sec/3600)}h`;
+  };
+
   return (
-    <div className="flex h-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl font-mono text-sm animate-fade-in">
-      
-      {/* Sidebar Controls */}
-      <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden md:flex">
-        <div className="p-4 border-b border-slate-800 bg-slate-900/50">
-           <h3 className="text-slate-200 font-semibold flex items-center space-x-2">
-             <Command size={16} className="text-amber-500"/>
-             <span>Quick Commands</span>
-           </h3>
-        </div>
-        <div className="overflow-y-auto flex-1 p-2 space-y-4 custom-scrollbar">
-            {Object.entries(COMMAND_GROUPS).map(([group, commands]) => (
-                <div key={group}>
-                    <h4 className="px-3 py-1 text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{group}</h4>
-                    <div className="space-y-1">
-                        {commands.map((c) => (
-                            <button
-                                key={c.cmd}
-                                onClick={() => handleQuickAction(c)}
-                                className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-amber-400 transition-colors flex items-center group"
-                            >
-                                <ChevronRight size={12} className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500"/>
-                                <span className="truncate">{c.cmd}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            ))}
-        </div>
+    <div className="flex flex-col h-full space-y-4 animate-fade-in">
+        
+      {/* Node Status Indicator Bar */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                  <div className="relative">
+                      {serverStatus.running && <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-75"></div>}
+                      <div className={`w-3 h-3 rounded-full relative z-10 ${serverStatus.running ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                  </div>
+                  <span className={`text-sm font-medium ${serverStatus.running ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {serverStatus.running ? 'Node Running' : 'Node Stopped'}
+                  </span>
+              </div>
+              
+              <div className="h-4 w-px bg-slate-700 mx-2"></div>
+              
+              <div className="flex items-center space-x-2 text-xs text-slate-400">
+                  <Server size={14} />
+                  <span className="font-mono">v26.0.0</span>
+              </div>
+
+              {serverStatus.running && (
+                  <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-400">
+                     <span className="text-slate-600">|</span>
+                     <span>Uptime: {formatUptime(serverStatus.uptime)}</span>
+                  </div>
+              )}
+          </div>
+
+          <div>
+             <button 
+                onClick={() => handleCommand(serverStatus.running ? 'stop' : 'bitcoind')}
+                className={`text-xs flex items-center space-x-1 px-3 py-1.5 rounded-lg border transition-colors font-medium ${
+                    serverStatus.running 
+                    ? 'border-rose-500/30 text-rose-400 hover:bg-rose-500/10' 
+                    : 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10'
+                }`}
+             >
+                 <Power size={12} />
+                 <span>{serverStatus.running ? 'Stop Node' : 'Start Node'}</span>
+             </button>
+          </div>
       </div>
 
-      {/* Terminal Main Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-            <TerminalIcon className="text-emerald-500 w-4 h-4" />
-            <span className="text-slate-300 font-medium">user@{promptHost}:~</span>
+      <div className="flex-1 flex bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl font-mono text-sm">
+        
+        {/* Sidebar Controls */}
+        <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden md:flex">
+            <div className="p-4 border-b border-slate-800 bg-slate-900/50">
+            <h3 className="text-slate-200 font-semibold flex items-center space-x-2">
+                <Command size={16} className="text-amber-500"/>
+                <span>Quick Commands</span>
+            </h3>
             </div>
-            <div className="flex space-x-2">
-                <button onClick={() => setHistory([])} className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300" title="Clear">
-                    <Trash2 size={14} />
-                </button>
+            <div className="overflow-y-auto flex-1 p-2 space-y-4 custom-scrollbar">
+                {Object.entries(COMMAND_GROUPS).map(([group, commands]) => (
+                    <div key={group}>
+                        <h4 className="px-3 py-1 text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{group}</h4>
+                        <div className="space-y-1">
+                            {commands.map((c) => (
+                                <button
+                                    key={c.cmd}
+                                    onClick={() => handleQuickAction(c)}
+                                    className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-amber-400 transition-colors flex items-center group"
+                                >
+                                    <ChevronRight size={12} className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500"/>
+                                    <span className="truncate">{c.cmd}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
 
-        {/* Output */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 cursor-text" onClick={() => inputRef.current?.focus()}>
-            {history.map((line, idx) => (
-            <div key={idx} className={`${
-                line.type === 'input' ? 'mt-4' : ''
-            }`}>
-                {line.type === 'input' && (
-                  <div className="text-slate-100 font-bold flex items-center">
-                    <span className="text-amber-500 mr-2">$</span>
-                    <span>{line.content as string}</span>
-                  </div>
-                )}
-                
-                {line.type === 'error' && (
-                  <div className="text-rose-500 whitespace-pre-wrap">{line.content as string}</div>
-                )}
-                
-                {line.type === 'system' && (
-                   <div className="text-slate-400 italic mb-2">{line.content as string}</div>
-                )}
+        {/* Terminal Main Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+            <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                <TerminalIcon className="text-emerald-500 w-4 h-4" />
+                <span className="text-slate-300 font-medium">user@{promptHost}:~</span>
+                </div>
+                <div className="flex space-x-2">
+                    <button onClick={() => setHistory([])} className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300" title="Clear">
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            </div>
 
-                {line.type === 'output' && (
-                  <div className="text-slate-300">
-                    {typeof line.content === 'object' ? (
-                      <JsonRenderer value={line.content} root={true} />
-                    ) : (
-                      <div className="whitespace-pre-wrap text-emerald-500">{line.content as string}</div>
+            {/* Output */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 cursor-text" onClick={() => inputRef.current?.focus()}>
+                {history.map((line, idx) => (
+                <div key={idx} className={`${
+                    line.type === 'input' ? 'mt-4' : ''
+                }`}>
+                    {line.type === 'input' && (
+                    <div className="text-slate-100 font-bold flex items-center">
+                        <span className="text-amber-500 mr-2">$</span>
+                        <span>{line.content as string}</span>
+                    </div>
                     )}
-                  </div>
-                )}
-            </div>
-            ))}
-            <div ref={bottomRef} />
-        </div>
+                    
+                    {line.type === 'error' && (
+                    <div className="text-rose-500 whitespace-pre-wrap">{line.content as string}</div>
+                    )}
+                    
+                    {line.type === 'system' && (
+                    <div className="text-slate-400 italic mb-2">{line.content as string}</div>
+                    )}
 
-        {/* Input Line */}
-        <div className="p-4 bg-slate-900/50 border-t border-slate-800 flex items-center">
-            <span className="text-amber-500 mr-2 font-bold">$</span>
-            <input 
-            ref={inputRef}
-            type="text" 
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            className="flex-1 bg-transparent border-none outline-none text-slate-100 placeholder-slate-700 w-full"
-            placeholder="Enter command..."
-            autoFocus
-            />
+                    {line.type === 'log' && (
+                    <div className="text-slate-500 font-mono text-xs">{line.content as string}</div>
+                    )}
+
+                    {line.type === 'output' && (
+                    <div className="text-slate-300">
+                        {typeof line.content === 'object' ? (
+                        <JsonRenderer value={line.content} root={true} />
+                        ) : (
+                        <div className="whitespace-pre-wrap text-emerald-500">{line.content as string}</div>
+                        )}
+                    </div>
+                    )}
+                </div>
+                ))}
+                <div ref={bottomRef} />
+            </div>
+
+            {/* Input Line */}
+            <div className="p-4 bg-slate-900/50 border-t border-slate-800 flex items-center">
+                <span className="text-amber-500 mr-2 font-bold">$</span>
+                <input 
+                ref={inputRef}
+                type="text" 
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={onKeyDown}
+                className="flex-1 bg-transparent border-none outline-none text-slate-100 placeholder-slate-700 w-full"
+                placeholder="Enter command (e.g., bitcoind, bitcoin-cli getbalance)..."
+                autoFocus
+                />
+            </div>
         </div>
       </div>
     </div>

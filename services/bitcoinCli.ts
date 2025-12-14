@@ -8,6 +8,15 @@ interface WalletContext {
 // Key: "NETWORK:ADDRESS", Value: Transaction[]
 const TX_STORE: Record<string, Transaction[]> = {};
 
+// Server Simulation State
+let isNodeRunning = true;
+let startUpTime = Date.now();
+
+export const getNodeStatus = () => ({
+    running: isNodeRunning,
+    uptime: isNodeRunning ? Math.floor((Date.now() - startUpTime) / 1000) : 0
+});
+
 const generateHash = () => {
   const chars = '0123456789abcdef';
   let result = '';
@@ -129,18 +138,58 @@ export const executeBitcoinCli = async (
   // Simulate network latency
   await new Promise(resolve => setTimeout(resolve, 300));
 
+  const lowerCmd = command.toLowerCase();
+
+  // 1. Handle "bitcoin-cli" wrapper command
+  if (lowerCmd === 'bitcoin-cli') {
+      if (args.length === 0) {
+          throw new Error("Usage: bitcoin-cli <command> [params] ");
+      }
+      const subCommand = args[0];
+      const subArgs = args.slice(1);
+      // Recursively call with stripped arguments
+      return executeBitcoinCli(subCommand, subArgs, network, context);
+  }
+
+  // 2. Handle Server Management (bitcoind / stop)
+  if (lowerCmd === 'bitcoind') {
+      if (isNodeRunning) return "Zenith Bitcoin Core is already running.";
+      isNodeRunning = true;
+      startUpTime = Date.now();
+      return "STARTING_SEQUENCE"; // Special flag for Console.tsx to handle logs
+  }
+
+  if (lowerCmd === 'stop') {
+      if (!isNodeRunning) return "Zenith Bitcoin Core is not running.";
+      isNodeRunning = false;
+      return "Zenith Bitcoin Core server stopping";
+  }
+
+  // 3. Check Server Status for all other commands
+  // 'help' is allowed even if stopped (in this sim), but technically help requires RPC. 
+  // We'll enforce strict RPC rules: no RPC if stopped.
+  if (!isNodeRunning) {
+      throw new Error(`error: couldn't connect to server: Connection refused\nIs bitcoind running?`);
+  }
+
   const currentAddress = context?.address || '';
   // Don't execute wallet commands without an address (except importdescriptors and others that create/load wallets)
-  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo', 'listaddressgroupings', 'getwalletinfo', 'listunspent', 'dumpwallet', 'signrawtransactionwithwallet'].includes(command.toLowerCase())) {
+  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo', 'listaddressgroupings', 'getwalletinfo', 'listunspent', 'dumpwallet', 'signrawtransactionwithwallet'].includes(lowerCmd)) {
      throw new Error("No wallet loaded. Please import or create a wallet.");
   }
 
   const history = currentAddress ? getHistory(network, currentAddress) : [];
 
-  switch (command.toLowerCase()) {
+  switch (lowerCmd) {
     case 'help':
         return `
-Available commands:
+Zenith Bitcoin Core RPC client version v26.0.0
+Usage: bitcoin-cli <command> [params]
+
+== Server Control ==
+bitcoind               Start the Bitcoin Core server
+stop                   Stop the Bitcoin Core server
+
 == Wallet ==
 getbalance, getnewaddress, getaddressinfo, sendtoaddress, listreceivedbyaddress, listunspent, getwalletinfo, dumpwallet, encryptwallet, importdescriptors, generatetoaddress, sendmany
 
@@ -499,6 +548,6 @@ createrawtransaction, decoderawtransaction, signrawtransactionwithwallet, sendra
         };
 
     default:
-       throw new Error(`Command not found: ${command}. Type "help" for a list of commands.`);
+       throw new Error(`Command not found: ${lowerCmd}. Type "help" for a list of commands.`);
   }
 };
