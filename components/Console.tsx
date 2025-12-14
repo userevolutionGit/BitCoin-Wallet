@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown, Wallet } from 'lucide-react';
+import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown } from 'lucide-react';
 import { EXAMPLE_ADDRESS, Network } from '../types';
 import { executeBitcoinCli } from '../services/bitcoinCli';
 
@@ -123,129 +123,26 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
     const args = cmd.trim().split(' ');
     const command = args[0].toLowerCase();
     
-    let output: string | object = '';
-    let type: ConsoleLine['type'] = 'output';
+    // Client-side only commands
+    if (command === 'clear') {
+        setHistory([]);
+        return;
+    }
 
     // Optimistically add input to history
     setHistory(prev => [...prev, { type: 'input', content: cmd }]);
 
-    // Attempt to use shared service first for supported commands
     try {
+      // Execute command via the simulate service
       const serviceResult = await executeBitcoinCli(command, args.slice(1), network, { address: currentAddress });
-      if (serviceResult !== null) {
+      
+      // If serviceResult is null (undefined in switch), the service throws an error in default case now, so this check is redundant but safe
+      if (serviceResult !== undefined && serviceResult !== null) {
         setHistory(prev => [...prev, { type: 'output', content: serviceResult }]);
-        return; // Exit if service handled it
       }
     } catch (e: any) {
-      setHistory(prev => [...prev, { type: 'error', content: e.message || 'RPC connection failure.' }]);
-      return;
+      setHistory(prev => [...prev, { type: 'error', content: e.message || 'Error executing command.' }]);
     }
-
-    // Fallback to local mocks for visualization commands not yet in service
-    switch (command) {
-      case 'help':
-        output = `
-Available commands:
-${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[group as keyof typeof COMMAND_GROUPS].map(c => c.cmd).join('\n')}`).join('\n')}
-        `;
-        break;
-      case 'clear':
-        setHistory([]);
-        return; // Special case, no output line needed
-      case 'sendtoaddress':
-        // Fallback if service failed for some reason
-        if (args.length < 3) {
-            output = 'Error: Invalid parameters. Usage: sendtoaddress <address> <amount>';
-            type = 'error';
-        } else {
-            output = 'txid: ' + Math.random().toString(16).substring(2);
-        }
-        break;
-      case 'listunspent':
-        output = [
-          { txid: "d4f3...", vout: 0, address: placeholderAddress, amount: 0.50000000, confirmations: 120 },
-          { txid: "a1b2...", vout: 1, address: placeholderAddress, amount: 0.74503211, confirmations: 6 }
-        ];
-        break;
-      case 'getwalletinfo':
-        output = {
-          walletname: network === 'TESTNET' ? "ZenithTest" : "ZenithMain",
-          walletversion: 169900,
-          balance: network === 'TESTNET' ? 1.24503211 : 0.05234891,
-          unconfirmed_balance: 0.00000000,
-          immature_balance: 0.00000000,
-          txcount: 42,
-          keypoololdest: 1698000000,
-          keypoolsize: 1000
-        };
-        break;
-      case 'dumpwallet':
-        output = args[1] 
-            ? `Wallet dumped to file: ${args[1]}` 
-            : 'Error: Please specify a filename';
-        if (!args[1]) type = 'error';
-        break;
-      case 'encryptwallet':
-        output = 'wallet encrypted; The keypool has been flushed and a new one generated. The wallet is now locked.';
-        break;
-      case 'getblockcount':
-        output = network === 'TESTNET' ? '2578021' : '834120';
-        break;
-      case 'getbestblockhash':
-        output = '0000000000000000000182746c8f92j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9';
-        break;
-      case 'getblock':
-        output = {
-          hash: args[1] || "0000... (example)",
-          confirmations: 1,
-          size: 1523,
-          weight: 4000,
-          height: 834120,
-          version: 536870912,
-          merkleroot: "a1b2...",
-          tx: ["tx1...", "tx2..."],
-          time: 1709200000
-        };
-        break;
-      case 'getblockhash':
-        output = '0000000000000000000182746c8f92j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9';
-        break;
-      case 'createrawtransaction':
-        output = '0200000001' + Math.random().toString(16).substring(2);
-        break;
-      case 'decoderawtransaction':
-        output = { txid: "...", version: 2, locktime: 0, vin: [], vout: [] };
-        break;
-      case 'signrawtransactionwithwallet':
-        output = { hex: "0200...", complete: true };
-        break;
-      case 'sendrawtransaction':
-         output = Math.random().toString(16).substring(2) + Math.random().toString(16).substring(2);
-         break;
-      case 'getrawtransaction':
-        output = '0200000001' + Math.random().toString(16).substring(2) + '...';
-        break;
-      case 'estimatesmartfee':
-        output = { feerate: 0.00001000, blocks: args[1] || 6 };
-        break;
-      case 'validateaddress':
-        output = {
-          isvalid: true,
-          address: args[1] || placeholderAddress,
-          scriptPubKey: "5120...",
-          isscript: false,
-          iswitness: true
-        };
-        break;
-      default:
-        output = `Command not found: ${command}. Type "help" for a list of commands.`;
-        type = 'error';
-    }
-
-    setHistory(prev => [
-      ...prev, 
-      { type, content: output }
-    ]);
   };
 
   const handleQuickAction = (cmdObj: { cmd: string, args: boolean, template?: string }) => {
@@ -359,14 +256,6 @@ ${Object.keys(COMMAND_GROUPS).map(group => `\n== ${group} ==\n${COMMAND_GROUPS[g
             placeholder="Enter command..."
             autoFocus
             />
-            <button
-                onClick={() => handleCommand('getwalletinfo')}
-                className="ml-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-500 hover:text-amber-400 text-xs font-mono rounded border border-slate-700 transition-colors flex items-center space-x-1"
-                title="Get Wallet Info"
-            >
-                <Wallet size={14} />
-                <span className="hidden sm:inline">getwalletinfo</span>
-            </button>
         </div>
       </div>
     </div>

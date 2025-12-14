@@ -21,7 +21,8 @@ const App: React.FC = () => {
   const [walletState, setWalletState] = useState<WalletState>(INITIAL_WALLET_STATE);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [network, setNetwork] = useState<Network>('TESTNET');
-  const [btcPrice, setBtcPrice] = useState<number>(0);
+  // Fixed simulated price since API was removed
+  const [btcPrice, setBtcPrice] = useState<number>(65000);
   const [fetchedBalance, setFetchedBalance] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   
@@ -31,25 +32,6 @@ const App: React.FC = () => {
     MAINNET: MAINNET_ADDRESS
   });
   const [showImportModal, setShowImportModal] = useState(false);
-
-  // Fetch Bitcoin Price
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const response = await fetch('https://api.coindesk.com/v1/bpi/currentprice.json');
-        const data = await response.json();
-        if (data?.bpi?.USD?.rate_float) {
-          setBtcPrice(data.bpi.USD.rate_float);
-        }
-      } catch (error) {
-        console.error('Failed to fetch Bitcoin price:', error);
-      }
-    };
-
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, []);
 
   const currentAddress = addresses[network];
   const hasWallet = Boolean(addresses.TESTNET || addresses.MAINNET);
@@ -247,11 +229,10 @@ const App: React.FC = () => {
         </nav>
 
         <div className="p-4 m-4 bg-slate-900 rounded-xl border border-slate-800">
-          <p className="text-xs text-slate-500 mb-2">Current BTC Price</p>
+          <p className="text-xs text-slate-500 mb-2">Market Price (Simulated)</p>
           <p className="text-lg font-bold text-white">
-            {btcPrice ? `$${btcPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Loading...'}
+            {`$${btcPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           </p>
-          <span className="text-xs text-emerald-400 font-medium">Live from CoinDesk</span>
         </div>
       </aside>
 

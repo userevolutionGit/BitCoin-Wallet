@@ -131,13 +131,26 @@ export const executeBitcoinCli = async (
 
   const currentAddress = context?.address || '';
   // Don't execute wallet commands without an address (except importdescriptors and others that create/load wallets)
-  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo', 'listaddressgroupings'].includes(command.toLowerCase())) {
+  if (!currentAddress && ['getbalance', 'sendtoaddress', 'listtransactions', 'generatetoaddress', 'sendmany', 'listreceivedbyaddress', 'getaddressinfo', 'listaddressgroupings', 'getwalletinfo', 'listunspent', 'dumpwallet', 'signrawtransactionwithwallet'].includes(command.toLowerCase())) {
      throw new Error("No wallet loaded. Please import or create a wallet.");
   }
 
   const history = currentAddress ? getHistory(network, currentAddress) : [];
 
   switch (command.toLowerCase()) {
+    case 'help':
+        return `
+Available commands:
+== Wallet ==
+getbalance, getnewaddress, getaddressinfo, sendtoaddress, listreceivedbyaddress, listunspent, getwalletinfo, dumpwallet, encryptwallet, importdescriptors, generatetoaddress, sendmany
+
+== Blockchain ==
+getblockchaininfo, getblockcount, getbestblockhash, getblock, getblockhash
+
+== Utility ==
+createrawtransaction, decoderawtransaction, signrawtransactionwithwallet, sendrawtransaction, getrawtransaction, estimatesmartfee, validateaddress, getconnectioncount
+`;
+
     case 'importdescriptors':
         // usage: importdescriptors '[{"desc": "...", "active": true, ...}]'
         let requests;
@@ -363,7 +376,129 @@ export const executeBitcoinCli = async (
         verificationprogress: 0.99999
       };
 
+    // New simulated commands replacing hardcoded Console logic
+
+    case 'listunspent':
+        const unspentBalance = calculateBalance(history);
+        if (unspentBalance <= 0) return [];
+        return [
+            { 
+                txid: generateHash(), 
+                vout: 0, 
+                address: currentAddress, 
+                amount: unspentBalance, 
+                scriptPubKey: "76a914...", 
+                confirmations: Math.floor(Math.random() * 100) + 6, 
+                spendable: true, 
+                solvable: true, 
+                safe: true 
+            }
+        ];
+
+    case 'getwalletinfo':
+        return {
+            walletname: network === 'TESTNET' ? "ZenithTest" : "ZenithMain",
+            walletversion: 169900,
+            format: "sqlite",
+            balance: calculateBalance(history),
+            unconfirmed_balance: 0.00000000,
+            immature_balance: 0.00000000,
+            txcount: history.length,
+            keypoololdest: Math.floor(Date.now()/1000) - 86400,
+            keypoolsize: 1000,
+            hdseedid: "0000000000000000000000000000000000000000",
+            private_keys_enabled: true,
+            avoid_reuse: false,
+            scanning: false,
+            descriptor: true
+        };
+
+    case 'dumpwallet':
+        if (!args[0]) throw new Error("Usage: dumpwallet <filename>");
+        return { filename: args[0], warning: "This is a simulation. No file was actually written." };
+
+    case 'encryptwallet':
+        if (!args[0]) throw new Error("Usage: encryptwallet <passphrase>");
+        return "wallet encrypted; The keypool has been flushed and a new one generated. The wallet is now locked.";
+
+    case 'getblockcount':
+        return network === 'TESTNET' ? 2578021 : 834120;
+
+    case 'getbestblockhash':
+        return "0000000000000000000182746c8f92j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9";
+
+    case 'getblock':
+        if (!args[0]) throw new Error("Usage: getblock <blockhash>");
+        return {
+            hash: args[0],
+            confirmations: 1,
+            size: 1523,
+            weight: 4000,
+            height: network === 'TESTNET' ? 2578021 : 834120,
+            version: 536870912,
+            merkleroot: generateHash(),
+            tx: [generateHash(), generateHash()],
+            time: Math.floor(Date.now() / 1000),
+            nonce: 0,
+            bits: "1d00ffff",
+            difficulty: 1,
+            chainwork: "0000000000000000000000000000000000000000000000000000000000000000",
+            nTx: 2,
+            previousblockhash: generateHash()
+        };
+
+    case 'getblockhash':
+        if (!args[0]) throw new Error("Usage: getblockhash <height>");
+        return generateHash();
+
+    case 'createrawtransaction':
+        return "0200000001" + generateHash();
+
+    case 'decoderawtransaction':
+        return {
+            txid: generateHash(),
+            hash: generateHash(),
+            version: 2,
+            size: 225,
+            vsize: 144,
+            weight: 573,
+            locktime: 0,
+            vin: [],
+            vout: []
+        };
+
+    case 'signrawtransactionwithwallet':
+        if (!args[0]) throw new Error("Usage: signrawtransactionwithwallet <hex>");
+        return {
+            hex: args[0] + "signed", 
+            complete: true
+        };
+
+    case 'sendrawtransaction':
+        if (!args[0]) throw new Error("Usage: sendrawtransaction <hex>");
+        return generateHash();
+
+    case 'getrawtransaction':
+        if (!args[0]) throw new Error("Usage: getrawtransaction <txid>");
+        return "02000000000101" + generateHash();
+
+    case 'estimatesmartfee':
+        return {
+            feerate: 0.00001000,
+            blocks: parseInt(args[0]) || 6
+        };
+
+    case 'validateaddress':
+        if (!args[0]) throw new Error("Usage: validateaddress <address>");
+        return {
+            isvalid: true,
+            address: args[0],
+            scriptPubKey: "76a914...",
+            isscript: false,
+            iswitness: true
+        };
+
     default:
-       return null;
+       throw new Error(`Command not found: ${command}. Type "help" for a list of commands.`);
   }
 };
