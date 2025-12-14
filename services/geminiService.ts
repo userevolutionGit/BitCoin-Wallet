@@ -1,15 +1,26 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize the client.
-// Note: In a production app, never expose keys on the client side. 
-// This is for demonstration purposes within the specified environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize the client lazily to avoid startup crashes if API_KEY is missing.
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  // Check if key is missing, empty, or is the default placeholder
+  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
+    console.warn("Gemini API Key is missing or invalid. Check your .env file.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const getCryptoAdvice = async (
   query: string,
   currentContext?: string
 ): Promise<string> => {
   try {
+    const ai = getAiClient();
+    if (!ai) {
+      return "AI Service Unavailable: Please configure your valid Google Gemini API Key in the .env file and restart the development server.";
+    }
+
     const model = 'gemini-2.5-flash';
     
     const systemInstruction = `You are Zenith, an expert cryptocurrency AI advisor. 
@@ -40,6 +51,11 @@ export const getCryptoAdvice = async (
 
 export const analyzeTransactionRisk = async (address: string, amount: number): Promise<string> => {
   try {
+    const ai = getAiClient();
+    if (!ai) {
+      return "Risk Analysis Unavailable: Missing API Key. Please check your .env configuration.";
+    }
+
     const model = 'gemini-2.5-flash';
     const prompt = `Analyze the risk of sending ${amount} BTC to address ${address}. 
     Since this is a simulation, provide general safety tips for verifying Bitcoin addresses and avoiding common scams. 
