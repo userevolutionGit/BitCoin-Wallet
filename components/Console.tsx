@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown, Server, Power } from 'lucide-react';
+import { Terminal as TerminalIcon, Trash2, ChevronRight, Command, ChevronDown, Server, Power, Link, Unplug } from 'lucide-react';
 import { EXAMPLE_ADDRESS, Network } from '../types';
 import { executeBitcoinCli, getNodeStatus } from '../services/bitcoinCli';
 
@@ -81,7 +81,7 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
   const placeholderAddress = currentAddress || EXAMPLE_ADDRESS;
   const promptHost = network === 'TESTNET' ? 'zenith-testnet' : 'zenith-mainnet';
 
-  // Poll for server status (e.g. up/down/uptime)
+  // Poll for server status (e.g. up/down/uptime/mode)
   useEffect(() => {
       const interval = setInterval(() => {
           setServerStatus(getNodeStatus());
@@ -90,6 +90,11 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
   }, []);
 
   const COMMAND_GROUPS = {
+    Connection: [
+        { cmd: 'connect', args: true, template: 'connect http://127.0.0.1:8332 user pass' },
+        { cmd: 'disconnect', args: false },
+        { cmd: 'getnetworkinfo', args: false },
+    ],
     Server: [
         { cmd: 'bitcoind', args: false },
         { cmd: 'stop', args: false },
@@ -112,15 +117,6 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
       { cmd: 'getbestblockhash', args: false },
       { cmd: 'getblock', args: true, template: 'getblock 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f' },
       { cmd: 'getblockhash', args: true, template: 'getblockhash 0' },
-    ],
-    Utility: [
-      { cmd: 'createrawtransaction', args: false },
-      { cmd: 'decoderawtransaction', args: true, template: 'decoderawtransaction 0200...' },
-      { cmd: 'signrawtransactionwithwallet', args: true, template: 'signrawtransactionwithwallet 0200...' },
-      { cmd: 'sendrawtransaction', args: true, template: 'sendrawtransaction 0200...' },
-      { cmd: 'getrawtransaction', args: true, template: 'getrawtransaction <txid>' },
-      { cmd: 'estimatesmartfee', args: true, template: 'estimatesmartfee 6' },
-      { cmd: 'validateaddress', args: true, template: `validateaddress ${placeholderAddress}` },
     ]
   };
 
@@ -172,7 +168,7 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
     setHistory(prev => [...prev, { type: 'input', content: cmd }]);
 
     try {
-      // Execute command via the simulate service
+      // Execute command via the simulate service (which may call real node now)
       const serviceResult = await executeBitcoinCli(command, args.slice(1), network, { address: currentAddress });
       
       // Special Handling for "bitcoind" command visualization
@@ -224,19 +220,19 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
                       <div className={`w-3 h-3 rounded-full relative z-10 ${serverStatus.running ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
                   </div>
                   <span className={`text-sm font-medium ${serverStatus.running ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {serverStatus.running ? 'Node Running' : 'Node Stopped'}
+                      {serverStatus.mode === 'REAL' ? 'Real Node Connected' : (serverStatus.running ? 'Simulation Running' : 'Node Stopped')}
                   </span>
               </div>
               
-              <div className="h-4 w-px bg-slate-700 mx-2"></div>
+              <div className="h-4 w-px bg-slate-700 mx-2 hidden sm:block"></div>
               
-              <div className="flex items-center space-x-2 text-xs text-slate-400">
+              <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-400">
                   <Server size={14} />
                   <span className="font-mono">v26.0.0</span>
               </div>
 
               {serverStatus.running && (
-                  <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-400">
+                  <div className="hidden md:flex items-center space-x-2 text-xs text-slate-400">
                      <span className="text-slate-600">|</span>
                      <span>Uptime: {formatUptime(serverStatus.uptime)}</span>
                   </div>
@@ -244,17 +240,27 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
           </div>
 
           <div>
-             <button 
-                onClick={() => handleCommand(serverStatus.running ? 'stop' : 'bitcoind')}
-                className={`text-xs flex items-center space-x-1 px-3 py-1.5 rounded-lg border transition-colors font-medium ${
-                    serverStatus.running 
-                    ? 'border-rose-500/30 text-rose-400 hover:bg-rose-500/10' 
-                    : 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10'
-                }`}
-             >
-                 <Power size={12} />
-                 <span>{serverStatus.running ? 'Stop Node' : 'Start Node'}</span>
-             </button>
+             {serverStatus.mode === 'REAL' ? (
+                <button 
+                  onClick={() => handleCommand('disconnect')}
+                  className="text-xs flex items-center space-x-1 px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors font-medium"
+                >
+                   <Unplug size={12} />
+                   <span>Disconnect</span>
+                </button>
+             ) : (
+                <button 
+                    onClick={() => handleCommand(serverStatus.running ? 'stop' : 'bitcoind')}
+                    className={`text-xs flex items-center space-x-1 px-3 py-1.5 rounded-lg border transition-colors font-medium ${
+                        serverStatus.running 
+                        ? 'border-rose-500/30 text-rose-400 hover:bg-rose-500/10' 
+                        : 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10'
+                    }`}
+                >
+                    <Power size={12} />
+                    <span>{serverStatus.running ? 'Stop Simulation' : 'Start Simulation'}</span>
+                </button>
+             )}
           </div>
       </div>
 
@@ -352,7 +358,7 @@ const Console: React.FC<ConsoleProps> = ({ network, currentAddress }) => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
                 className="flex-1 bg-transparent border-none outline-none text-slate-100 placeholder-slate-700 w-full"
-                placeholder="Enter command (e.g., bitcoind, bitcoin-cli getbalance)..."
+                placeholder="Enter command..."
                 autoFocus
                 />
             </div>
